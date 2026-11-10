@@ -1,0 +1,49 @@
+# build trees
+build/
+build*/
+build-mac/
+dist/
+Testing/
+CMakeCache.txt
+CMakeFiles/
+compile_commands.json
+
+# disk images, ROMs and Mac binaries: never in git (Apple-copyrighted or large)
+*.hda
+*.img
+*.dsk
+*.image
+*.iso
+*.toast
+*.dmg
+*.rom
+*.ROM
+*.bin
+*.hqx
+*.sit
+*.sea
+*.cpt
+*.pcap
+
+# objects and editor/host junk
+*.o
+*.a
+*.so
+*.out
+__pycache__/
+*.pyc
+.DS_Store
+*.swp
+*~
+
+# hardware-session suites (specs, raw results, diagnostic kit scripts): kept by the author, not in git
+docs/dev/hw*-spec.md
+docs/dev/hw*-results/
+docs/dev/hwsend*.md
+docs/dev/PLAN-PROPOSALS-hw1.md
+docs/poll-path*
+scripts/hwsend*
+MoofBatch.cfg
+
+# personal agent notes
+CLAUDE.local.md

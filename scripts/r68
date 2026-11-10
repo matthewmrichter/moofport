@@ -1,0 +1,38 @@
+#!/bin/sh
+# r68 - run a command inside the pinned Retro68 Docker container.
+#
+# Port of MoofTCP's scripts/r68 (TOOLCHAIN.md "Retro68 in Docker"). The image is
+# ghcr.io/autc04/retro68, pinned by digest read from tools/retro68.digest (never a
+# floating tag), so every build uses byte-identical tools. The repo is bind-mounted
+# at /src, the command runs as the caller's uid/gid, and HOME is /tmp because the
+# container's image has no passwd entry or home for an arbitrary uid.
+#
+#   scripts/r68 cmake -S mac -B build-mac ...
+#   scripts/r68 ResInfo -a build-mac/hello_init/HelloInit.bin
+#
+# Nothing here is Apple-copyrighted; the image ships only the cross toolchain.
+set -eu
+
+ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+DIGEST_FILE="$ROOT/tools/retro68.digest"
+IMAGE_REPO="ghcr.io/autc04/retro68"
+
+die() { echo "r68: $*" >&2; exit 1; }
+
+command -v docker >/dev/null 2>&1 || die "docker not found; docker.io must be installed and the user must join the docker group (see docs)"
+[ -f "$DIGEST_FILE" ] || die "missing $DIGEST_FILE"
+
+# The digest is the first line that looks like sha256:<64 hex>; comment lines are ignored.
+DIGEST="$(grep -Eo 'sha256:[0-9a-f]{64}' "$DIGEST_FILE" | head -n1 || true)"
+[ -n "$DIGEST" ] || die "no sha256:... digest in $DIGEST_FILE (fill it in; see the comment in that file)"
+
+IMAGE="$IMAGE_REPO@$DIGEST"
+
+[ $# -ge 1 ] || die "usage: r68 <command> [args...]"
+
+exec docker run --rm \
+  -u "$(id -u):$(id -g)" \
+  -e HOME=/tmp \
+  -v "$ROOT:/src" \
+  -w /src \
+  "$IMAGE" "$@"

@@ -1,0 +1,23 @@
+name: host-tests
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  host-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Configure (ASan + UBSan)
+        run: cmake -S . -B build -DMP_SANITIZE=ON
+      - name: Build
+        run: cmake --build build -j"$(nproc)"
+      - name: Test
+        run: ctest --test-dir build --output-on-failure
+      - name: Core portability smoke check (m68k, -m68000)
+        run: |
+          sudo apt-get update -q && sudo apt-get install -y -q gcc-m68k-linux-gnu
+          for f in core/*.c; do
+            m68k-linux-gnu-gcc -m68000 -Os -std=c99 -Wall -Wextra -Werror -pedantic -c "$f" -o /dev/null
+          done

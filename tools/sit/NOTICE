@@ -1,0 +1,11 @@
+tools/sit: StuffIt 1.5.1-compatible (Classic SIT, stored) archive writer for MoofPort's
+hardware-session bundles (scripts/hw-bundle.py).
+
+Origin: copied from MoofTCP (../mooftcp/tools/sit, commit ac5c0ce), which took it from SitStill
+(SitStill), MIT License, Copyright (c) 2026 SitStill contributors; the license text is
+in LICENSE next to this file.
+Copied unchanged from MoofTCP: classic_sit_writer.c, stream.c, sit_crc.c, classic_sit_internal.h,
+sitstill/classic_sit.h, sitstill/stream.h.
+mksit.c: MoofTCP's driver, extended for MoofPort with folders ("+Name" opens a folder, "-" closes
+it), using the writer's records API.
+"StuffIt" is a trademark of its respective owner; the name only describes format compatibility.
