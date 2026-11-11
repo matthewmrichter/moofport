@@ -18,6 +18,8 @@ All sockets bind 0.0.0.0 (EMULATOR.md: Snow NAT forwards the guest to the host's
 interface IP, so the guest reaches these as 172.17.0.1:<port>). The bulk size is
 BULK_BYTES (env, default 1048576). Log lines go to stdout; run it backgrounded with its
 output redirected, as the run scripts do.
+Echo and bulk lines end in "stalls N (...)" (gaps >= STALL_S); scripts/testnet-stalls.py splits
+them per MoofBatch test.
 
 Nothing here is Apple-copyrighted; it is an ordinary host test harness.
 """
@@ -70,15 +72,39 @@ def _wrap(handler, conn, addr, port):
         log("TCP %d close %s:%d" % (port, addr[0], addr[1]))
 
 
+# Stalls: a gap of STALL_S or more between two receives (or sends) on one connection. With the
+# Mac's sync sends a lost segment shows up here as a ~1 s gap (MacTCP's retransmission), so the
+# PC-side app can count them without a packet capture (hwsend auto1).
+STALL_S = 0.5
+
+
+class Stalls:
+    def __init__(self):
+        self.last = None
+        self.gaps = []
+
+    def tick(self):
+        now = time.time()
+        if self.last is not None and now - self.last >= STALL_S:
+            self.gaps.append(now - self.last)
+        self.last = now
+
+    def text(self):
+        return "stalls %d (%.2f s%s%s)" % (len(self.gaps), sum(self.gaps), ": " if self.gaps else "",
+                                          " ".join("%.2f" % g for g in self.gaps))
+
+
 def echo_handler(conn, addr):
     total = 0
+    st = Stalls()
     while True:
         data = conn.recv(CHUNK)
         if not data:
             break
+        st.tick()
         total += len(data)
         conn.sendall(data)
-    log("TCP %d echoed %d bytes to %s" % (ECHO_PORT, total, addr[0]))
+    log("TCP %d echoed %d bytes to %s; %s" % (ECHO_PORT, total, addr[0], st.text()))
 
 
 def discard_handler(conn, addr):
@@ -107,15 +133,18 @@ def bulk_source_handler(conn, addr):
     """Send BULK_BYTES bytes as fast as possible, then close."""
     buf = bytes(bytearray((i & 0xFF) for i in range(CHUNK)))
     sent = 0
+    st = Stalls()
     t0 = time.time()
+    st.last = t0
     while sent < BULK_BYTES:
         n = min(CHUNK, BULK_BYTES - sent)
         conn.sendall(buf[:n])
+        st.tick()
         sent += n
     dt = time.time() - t0
     rate = sent / dt if dt > 0 else 0.0
-    log("TCP %d bulk source sent %d bytes in %.3fs (%.0f B/s) to %s"
-        % (BULK_SRC_PORT, sent, dt, rate, addr[0]))
+    log("TCP %d bulk source sent %d bytes in %.3fs (%.0f B/s) to %s; %s"
+        % (BULK_SRC_PORT, sent, dt, rate, addr[0], st.text()))
 
 
 # TcpBench's send pattern: a 1,400-byte chunk whose byte j is j & 255, repeated. The sink checks
@@ -132,10 +161,12 @@ def bulk_sink_handler(conn, addr):
     bad = 0
     first_bad = None
     t0 = None
+    st = Stalls()
     while True:
         data = conn.recv(CHUNK)
         if not data:
             break
+        st.tick()
         if t0 is None:
             t0 = time.time()
         off = total % TCPBENCH_CHUNK
@@ -152,9 +183,10 @@ def bulk_sink_handler(conn, addr):
         total += len(data)
     dt = (time.time() - t0) if t0 else 0.0
     rate = total / dt if dt > 0 else 0.0
-    log("TCP %d bulk sink received %d bytes in %.3fs (%.0f B/s) from %s; TcpBench pattern: %s"
+    log("TCP %d bulk sink received %d bytes in %.3fs (%.0f B/s) from %s; TcpBench pattern: %s; %s"
         % (BULK_SINK_PORT, total, dt, rate, addr[0],
-           "all bytes match" if bad == 0 else "%d bytes differ, first at offset %d" % (bad, first_bad)))
+           "all bytes match" if bad == 0 else "%d bytes differ, first at offset %d" % (bad, first_bad),
+           st.text()))
 
 
 def serve_udp(port, drop):
