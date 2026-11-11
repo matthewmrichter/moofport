@@ -40,7 +40,9 @@
  * Before and after each test it sends "MARK <run> <setting> <n> <test> start|end" by UDP to the
  * PC's port 17040 (testnet.py logs it; scripts/hwsend-batch.py splits the capture by it). A
  * small window shows the setting, test N of M and the last result; it is redrawn only between
- * tests. Results: MoofBatch-<run id>.out. */
+ * tests. A line "rbuf <bytes>" (4096..32768, default 8192) sets the TCPCreate receive buffer
+ * (the TCP window); a value outside the range or not a number is refused: "rbuf: refused" and
+ * RESULT FAIL, nothing run. The header prints "rbuf: <bytes>". Results: MoofBatch-<run id>.out. */
 #include <Quickdraw.h>
 #include <Fonts.h>
 #include <Windows.h>
@@ -78,7 +80,15 @@ enum {
 #define TERM_BYTES  2000
 #define connectionClosing (-23005)
 #define commandTimeout    (-23016)
-#define RCVBUF_LEN  8192
+#define RECV_CHUNK  8192          /* R recv: bytes asked for per TCPRcv */
+#ifdef MP_BATCH
+#define RBUF_MIN    4096          /* MoofBatch.cfg "rbuf <bytes>": the TCPCreate receive buffer */
+#define RBUF_MAX    32768
+#define RBUF_DEF    8192
+#else
+#define RBUF_MAX    8192
+#define RBUF_DEF    8192
+#endif
 #define N_ECHO      64
 #define TOTAL       262144u
 #define SMALL       1400
@@ -110,7 +120,8 @@ static void p32(BenchPB *pb, int off, uint32_t v)
 
 static short g_ipp, g_enet;
 static uint32_t g_stream;
-static uint8_t g_strbuf[RCVBUF_LEN];
+static uint8_t g_strbuf[RBUF_MAX];
+static long g_rbuf = RBUF_DEF;    /* the length passed to TCPCreate */
 static uint8_t g_rcvbuf[64];
 static uint8_t g_data[BIG];
 static uint32_t g_host = HOST_IP;
@@ -205,7 +216,7 @@ static int16_t tcp_create(void)
     int16_t r;
     memset(&pb, 0, sizeof pb);
     p32(&pb, 0, (uint32_t)(uintptr_t)g_strbuf);
-    p32(&pb, 4, (uint32_t)RCVBUF_LEN);
+    p32(&pb, 4, (uint32_t)g_rbuf);
     r = call(&pb, CS_CREATE);
     if (r == 0) g_stream = pb.tcpStream;
     return r;
@@ -402,7 +413,7 @@ static void stack_line(void)
 static MpStats g_s0, g_s1;
 static MpDiagStats g_dg;
 static MpWLog g_wl;
-static uint8_t g_bigbuf[RCVBUF_LEN];
+static uint8_t g_bigbuf[RECV_CHUNK];
 
 static int enet_status(int16_t cs, void *buf, int16_t len)
 {
@@ -788,7 +799,7 @@ static void mode_recv(void)
         pb.tcpStream = g_stream;
         p8(&pb, 0, 20);
         p32(&pb, 4, (uint32_t)(uintptr_t)g_bigbuf);
-        p16(&pb, 8, (uint16_t)RCVBUF_LEN);
+        p16(&pb, 8, (uint16_t)RECV_CHUNK);
         r = call(&pb, CS_RCV);
         got = (uint16_t)((pb.csParam[8] << 8) | pb.csParam[9]);
         if (r == 0) total += got;
@@ -978,6 +989,11 @@ static void batch(void)
 }
 #endif
 
+#ifdef MP_BATCH
+static char g_rbuf_txt[16];       /* the cfg's rbuf value as written, for the refusal line */
+static int g_rbuf_bad;
+#endif
+
 static void read_cfg(void)
 {
 #ifdef MP_BATCH
@@ -1008,6 +1024,21 @@ static void read_cfg(void)
             if (l2 && i == 0 && !strncmp(l2 + 1, "settings ", 9)) {
                 strncpy(g_settings, l2 + 10, sizeof g_settings - 1);
                 g_settings[strcspn(g_settings, "\r\n")] = 0;
+            }
+            if (i == 0) {               /* a line "rbuf <bytes>" after the first */
+                char *p = buf;
+                while ((p = strpbrk(p, "\r\n")) != 0) {
+                    p++;
+                    if (!strncmp(p, "rbuf ", 5)) {
+                        char *e;
+                        long v;
+                        strncpy(g_rbuf_txt, p + 5, sizeof g_rbuf_txt - 1);
+                        g_rbuf_txt[strcspn(g_rbuf_txt, "\r\n")] = 0;
+                        v = strtol(g_rbuf_txt, &e, 10);
+                        if (e == g_rbuf_txt || *e || v < RBUF_MIN || v > RBUF_MAX) g_rbuf_bad = 1;
+                        else g_rbuf = v;
+                    }
+                }
             }
         }
 #endif
@@ -1050,6 +1081,14 @@ int main(void)
 #endif
     read_cfg();
     LOG("host %08lx, modes %s, start tick %lu\r", (unsigned long)g_host, g_modes, ticks());
+#ifdef MP_BATCH
+    if (g_rbuf_bad) {
+        LOG("rbuf: refused \"%s\" (need a number %d..%d)\r", g_rbuf_txt, RBUF_MIN, RBUF_MAX);
+        wr("RESULT FAIL\r");
+        goto fin;
+    }
+    LOG("rbuf: %ld\r", g_rbuf);
+#endif
     for (i = 0; i < (int)sizeof g_data; i++) g_data[i] = (uint8_t)i;
 
     if (OpenDriver((ConstStr255Param)"\p.IPP", &g_ipp)) { LOG("OpenDriver(.IPP) failed (is MacTCP installed?)\r"); goto fin; }

@@ -1,7 +1,7 @@
 """moofport.py - the MoofPort plugin for moofctl (MoofAgent repo: docs/REMOTE-HARNESS.md "moofctl plugins").
 
     moofctl --plugins scripts/moofctl-plugins moofport switch dayna|moofport [--installer NAME] [--no-verify]
-    moofctl --plugins scripts/moofctl-plugins moofport settings [--host IP] [--modes EACRAC] [--settings "new steady"]
+    moofctl --plugins scripts/moofctl-plugins moofport settings [--host IP] [--modes EACRAC] [--settings "new steady"] [--rbuf 16384]
 
 switch: changes the Mac's .ENET0 driver (DaynaPORT <-> MoofPort) with no one at the Mac, by running MoofPort's own
 installer unattended through MoofAgent (mac/installer/installer.c, "Unattended"):
@@ -15,7 +15,7 @@ Exit 0 ok, 2 a wrong result (installer or driver), 3 HUNG (from moofctl), 1 a ba
 The installer names its .out "<its own file name>-<id>.out" (the file MoofAgent launched), so the agent sees it finish
 and answers `done`; anything but `done` fails. The old .out is deleted first (and checked gone), so a RESULT line is this run's.
 
-settings: rewrites MoofBatch.cfg (line 1 "<host> <modes>", line 2 "settings <names>"); parts not given keep the old
+settings: rewrites MoofBatch.cfg (line 1 "<host> <modes>", line 2 "settings <names>", optional line 3 "rbuf <bytes>", 4096..32768); parts not given keep the old
 file's values. This is the core `settings` command's logic, taken over here (the core keeps its copy for one release).
 
 The core's names (do_restart, check_run_args, save_run, AgentError) come from moofctl.py, which is __main__ under
@@ -89,9 +89,12 @@ def driver_is_moofport(text_lines):
     return None
 
 
-def batch_cfg(old, host=None, modes=None, settings=None):
+RBUF_MIN, RBUF_MAX = 4096, 32768      # MoofBatch's accepted TCPCreate buffer (mac/tcpsend/tcpsend.c)
+
+
+def batch_cfg(old, host=None, modes=None, settings=None, rbuf=None):
     """MoofBatch.cfg text with line 1 "<host> <modes>" and line 2 "settings <names>" changed as
-    given (mac/tcpsend/tcpsend.c read_cfg). Missing parts keep the old file's values; MoofBatch's
+    given, and an optional line "rbuf <bytes>" (mac/tcpsend/tcpsend.c read_cfg). Missing parts keep the old file's values; MoofBatch's
     defaults stand in for a missing file. Mac line ends (CR)."""
     lines = old.replace("\r\n", "\r").replace("\n", "\r").split("\r") if old else []
     first = lines[0].split() if lines and lines[0].strip() else []
@@ -100,22 +103,34 @@ def batch_cfg(old, host=None, modes=None, settings=None):
         raise ValueError("MoofBatch.cfg has no host yet: give --host")
     m = modes or (first[1] if len(first) > 1 else "EACRAC")
     s = settings
-    if s is None:
-        for ln in lines[1:]:
-            if ln.startswith("settings "):
-                s = ln[9:].strip()
+    rb = rbuf
+    if rb is not None:
+        try:
+            ok = RBUF_MIN <= int(str(rb), 10) <= RBUF_MAX
+        except ValueError:
+            ok = False
+        if not ok:
+            raise ValueError("rbuf %r: need a number %d..%d" % (rb, RBUF_MIN, RBUF_MAX))
+        rb = int(str(rb), 10)
+    for ln in lines[1:]:
+        if s is None and ln.startswith("settings "):
+            s = ln[9:].strip()
+        if rb is None and ln.startswith("rbuf "):
+            rb = ln[5:].strip()
     out = "%s %s\r" % (h, m)
     if s:
         out += "settings %s\r" % s
+    if rb is not None:
+        out += "rbuf %s\r" % rb
     return out
 
 
-def do_settings(core, agent, host=None, modes=None, settings=None):
+def do_settings(core, agent, host=None, modes=None, settings=None, rbuf=None):
     try:
         old = agent.get(BATCH_CFG).decode("mac_roman")
     except core.AgentError:
         old = ""
-    new = batch_cfg(old, host, modes, settings)
+    new = batch_cfg(old, host, modes, settings, rbuf)
     agent.put(BATCH_CFG, new.encode("mac_roman"))
     return new
 
@@ -199,6 +214,7 @@ def register(sub):
     st.add_argument("--host", help="MoofBatch.cfg line 1: the PC's address")
     st.add_argument("--modes", help="MoofBatch.cfg line 1: the modes, e.g. EACRAC")
     st.add_argument("--settings", help='MoofBatch.cfg line 2: the settings, e.g. "new steady"')
+    st.add_argument("--rbuf", help="MoofBatch.cfg line 3: the TCPCreate receive buffer, 4096..32768 (default 8192)")
 
 
 def dispatch(cmd, args, link, agent, log):
@@ -207,7 +223,7 @@ def dispatch(cmd, args, link, agent, log):
     core = _core()
     if args.moofport_cmd == "settings":
         try:
-            new = do_settings(core, agent, args.host, args.modes, args.settings)
+            new = do_settings(core, agent, args.host, args.modes, args.settings, args.rbuf)
         except ValueError as e:
             log("FAILED: %s" % e)
             return 1, agent

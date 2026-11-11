@@ -221,6 +221,30 @@ class SettingsTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             plug.batch_cfg("", settings="new")
 
+    def test_batch_cfg_rbuf(self):
+        old = "10.0.0.1 EA\rsettings new\r"
+        self.assertEqual(plug.batch_cfg(old, rbuf=16384), old + "rbuf 16384\r")
+        self.assertEqual(plug.batch_cfg(old + "rbuf 4096\r", modes="R"), "10.0.0.1 R\rsettings new\rrbuf 4096\r")
+        self.assertEqual(plug.batch_cfg(old + "rbuf 4096\r", rbuf="32768"), old + "rbuf 32768\r")
+        self.assertEqual(plug.batch_cfg("10.0.0.1 E\rrbuf 5000\r"), "10.0.0.1 E\rrbuf 5000\r")
+        for bad in (1000, 4095, 32769, "abc", "", "8k"):
+            with self.assertRaises(ValueError, msg=repr(bad)):
+                plug.batch_cfg(old, rbuf=bad)
+
+    def test_dispatch_rbuf(self):
+        msgs = []
+        agent = Agent([], None, None)
+        agent.files["MoofBatch.cfg"] = b"10.0.0.1 EA\rsettings new\r"
+        ap = argparse.ArgumentParser()
+        sub = ap.add_subparsers(dest="cmd")
+        plug.register(sub)
+        a = ap.parse_args(["moofport", "settings", "--rbuf", "16384"])
+        self.assertEqual(plug.dispatch("moofport", a, None, agent, msgs.append), (0, agent))
+        self.assertEqual(agent.files["MoofBatch.cfg"], b"10.0.0.1 EA\rsettings new\rrbuf 16384\r")
+        a = ap.parse_args(["moofport", "settings", "--rbuf", "1000"])
+        self.assertEqual(plug.dispatch("moofport", a, None, agent, msgs.append)[0], 1)
+        self.assertEqual(agent.files["MoofBatch.cfg"], b"10.0.0.1 EA\rsettings new\rrbuf 16384\r")
+
     def test_same_as_the_core_copy(self):
         for args in (("", "1.2.3.4", None, None), ("5.6.7.8 R\rsettings a b\r", None, "EA", None),
                      ("5.6.7.8 R\rsettings a b\r", None, None, "c")):
