@@ -5,16 +5,15 @@
 
 switch: changes the Mac's .ENET0 driver (DaynaPORT <-> MoofPort) with no one at the Mac, by running MoofPort's own
 installer unattended through MoofAgent (mac/installer/installer.c, "Unattended"):
-  1. delete the old Installer-sw-<target>.out and REQUIRE that it is gone;
+  1. delete the old <installer>-sw-<target>.out and REQUIRE that it is gone;
   2. PUT MoofPortInstall.cfg: "install" (moofport) or "uninstall" (dayna);
   3. RUN the installer (run id sw-<target>), GET its .out, check the LAST "RESULT" line against EXPECTED;
   4. restart the Mac if the installer changed the System file, and return only once the agent is back;
   5. RUN MoofStat sw-<target> and check its driver line: "MoofPort refnum ..." for moofport, "... not MoofPort ..."
      for dayna (--no-verify skips this).
 Exit 0 ok, 2 a wrong result (installer or driver), 3 HUNG (from moofctl), 1 a bad call.
-"RAN nostart" counts as ran when a fresh RESULT line is there: the installer can finish within MoofAgent's first look,
-and the agent watches for "<tool>-<id>.out", not the installer's "Installer-<id>.out"; RESULT is the last line the
-installer writes and the old .out was deleted first (and checked gone), so a RESULT line is this run's.
+The installer names its .out "<its own file name>-<id>.out" (the file MoofAgent launched), so the agent sees it finish
+and answers `done`; anything but `done` fails. The old .out is deleted first (and checked gone), so a RESULT line is this run's.
 
 settings: rewrites MoofBatch.cfg (line 1 "<host> <modes>", line 2 "settings <names>"); parts not given keep the old
 file's values. This is the core `settings` command's logic, taken over here (the core keeps its copy for one release).
@@ -28,7 +27,6 @@ import sys
 CORE = None                     # the moofctl module; None = find it (moofctl runs as __main__)
 
 CFG_NAME = "MoofPortInstall.cfg"
-OUT_TOOL = "Installer"          # the installer writes Installer-<run id>.out whatever the Mac file is called
 BATCH_CFG = "MoofBatch.cfg"
 DEFAULT_INSTALLER = "MoofPortInstall"
 
@@ -131,7 +129,7 @@ def do_switch(core, link, agent, target, installer=DEFAULT_INSTALLER, timeout=60
     except ValueError as e:
         log("FAILED: %s" % e)
         return 1, agent
-    out_name = "%s-%s.out" % (OUT_TOOL, rid)
+    out_name = "%s-%s.out" % (installer, rid)       # the installer names its .out after its own file name
     try:
         agent.delete(out_name)                      # never read a stale result
     except core.AgentError:
@@ -162,8 +160,7 @@ def do_switch(core, link, agent, target, installer=DEFAULT_INSTALLER, timeout=60
     log("installer: %s" % (text[0] if text else ""))
     log("result:    %s" % (res or "(no RESULT line)"))
     ok, changed = verdict(target, res)
-    # "nostart": see the module doc; RESULT is written last and the old .out was checked gone, so it is this run's
-    if ran["result"] not in ("done", "nostart") or not ok:
+    if ran["result"] != "done" or not ok:
         log("FAILED: switch %s: the installer did not do it (see %s)" % (target, os.path.join(outdir, out_name)))
         return 2, agent
     if changed:

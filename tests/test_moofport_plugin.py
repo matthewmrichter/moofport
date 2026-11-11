@@ -33,6 +33,7 @@ INSTALLED = "MoofPort is installed. Restart the Mac to use it."
 UPDATED = "MoofPort is updated. Restart the Mac to use the new version."
 BACK = "DaynaPORT's driver is back. Restart the Mac to use it."
 NOTHING = "Already DaynaPORT, nothing to do. Nothing was changed."
+NO_KEPT = "No DaynaPORT driver was kept; not removing the only Ethernet driver unattended. Nothing was changed."
 REFUSED = "DRVx 47 exists but DRVR 47 is not MoofPort. Nothing was changed."
 STAT_MP = b"MoofStat\rMoofPort refnum -48, SCSI ID 4, open 1, MAC 00:80:19:00:00:01\r"
 STAT_DAYNA = b"MoofStat\rrefnum -48: not MoofPort (Status = -18)\r"
@@ -90,7 +91,7 @@ class Agent:
             return {"tool": tool, "id": rid, "result": "done"}, self.stat, pc
         self.files.pop("MoofPortInstall.cfg", None)         # the installer reads and deletes it
         if self.installer_out is not None:
-            self.files["Installer-%s.out" % rid] = self.installer_out
+            self.files["%s-%s.out" % (tool, rid)] = self.installer_out
         return {"tool": tool, "id": rid, "result": self.ran_result}, None, pc
 
     def restart(self):
@@ -123,12 +124,12 @@ class SwitchTests(unittest.TestCase):
         self.assertIn("put MoofPortInstall.cfg 'install\\r'", self.log)
         self.assertEqual(len(self.calls("restart")), 1)
         self.assertEqual(self.log.index("link.open fresh=True"), self.log.index("restart") + 1)
-        order = [self.log.index(c) for c in ("delete Installer-sw-moofport.out", "get Installer-sw-moofport.out")]
+        order = [self.log.index(c) for c in ("delete MoofPortInstall-sw-moofport.out", "get MoofPortInstall-sw-moofport.out")]
         order += [self.log.index(self.calls(p)[0]) for p in ("put", "run MoofPortInstall", "restart", "run MoofStat")]
         self.assertEqual(order[0], 0)
         self.assertEqual(order[2:], sorted(order[2:]))
         self.assertIn("run MoofPortInstall sw-moofport", self.log)
-        self.assertTrue(os.path.exists(os.path.join(self.tmp, "Installer-sw-moofport.out")))
+        self.assertTrue(os.path.exists(os.path.join(self.tmp, "MoofPortInstall-sw-moofport.out")))
         self.assertTrue(os.path.exists(os.path.join(self.tmp, "MoofStat-sw-moofport.out")))
 
     def test_update_counts_and_restarts(self):
@@ -152,7 +153,7 @@ class SwitchTests(unittest.TestCase):
         self.assertEqual(self.calls("run MoofStat"), [])
 
     def test_refused_result_fails_without_restart(self):
-        for res in (REFUSED, "Cancelled. Nothing was changed.", None,
+        for res in (NO_KEPT, REFUSED, "Cancelled. Nothing was changed.", None,
                     "Unattended run without a valid MoofPortInstall.cfg (install or uninstall). Nothing was changed."):
             self.log.clear()
             self.assertEqual(self.switch("moofport", out_text(res), STAT_MP), 2, res)
@@ -182,8 +183,14 @@ class SwitchTests(unittest.TestCase):
         self.assertEqual(self.calls("run"), [])
         self.assertEqual(self.calls("put"), [])
 
-    def test_nostart_with_fresh_result_is_accepted(self):
-        self.assertEqual(self.switch("moofport", out_text(INSTALLED), STAT_MP, ran_result="nostart"), 0, self.msgs)
+    def test_nostart_is_a_failure(self):             # the installer names its .out after itself: the agent sees it, so `done`
+        self.assertEqual(self.switch("moofport", out_text(INSTALLED), STAT_MP, ran_result="nostart"), 2)
+        self.assertEqual(self.calls("restart"), [])
+
+    def test_out_is_named_after_the_installer_file(self):
+        self.assertEqual(self.switch("dayna", out_text(BACK), STAT_DAYNA, installer="MoofPortDiag"), 0, self.msgs)
+        self.assertIn("get MoofPortDiag-sw-dayna.out", self.log)
+        self.assertTrue(os.path.exists(os.path.join(self.tmp, "MoofPortDiag-sw-dayna.out")))
 
     def test_other_run_results_fail(self):
         self.assertEqual(self.switch("moofport", out_text(INSTALLED), STAT_MP, ran_result="timeout"), 2)
@@ -261,11 +268,15 @@ class TableTests(unittest.TestCase):
                 self.assertEqual(prefix, frag)
                 self.assertIn('"%s' % frag, src, "%s: %r is not the start of a string in installer.c" % (target, frag))
 
+    def test_refusal_texts_are_in_the_installer(self):
+        src = slurp("mac/installer/installer.c")
+        self.assertIn(NO_KEPT, src)                                  # one string literal, whole
+
     def test_cfg_name_and_out_name_are_the_installers(self):
         src = slurp("mac/installer/installer.c")
         self.assertIn('\\p%s"' % plug.CFG_NAME, src)
         self.assertIn('"unattended: no %s' % plug.CFG_NAME, src)
-        self.assertIn("Installer-<run id>.out", src)                  # header comment; runid.c builds the name
+        self.assertIn("own_name", src)                                # the .out is named after the running app
         self.assertIn('"uninstall"', src)                             # the words read_auto() takes
         self.assertIn('"install"', src)
 
@@ -280,6 +291,9 @@ class TableTests(unittest.TestCase):
         self.assertEqual(plug.verdict("dayna", INSTALLED), (False, False))
         self.assertEqual(plug.verdict("dayna", BACK), (True, True))
         self.assertEqual(plug.verdict("dayna", NOTHING), (True, False))
+        self.assertEqual(plug.verdict("dayna", "MoofPort is uninstalled. The Mac has no Ethernet driver now. Restart the Mac."),
+                         (False, False))
+        self.assertEqual(plug.verdict("dayna", NO_KEPT), (False, False))
         self.assertEqual(plug.verdict("dayna", "MoofPort is uninstalled. The Mac has no Ethernet driver now. Restart the Mac."),
                          (False, False))
         self.assertEqual(plug.verdict("moofport", None), (False, False))

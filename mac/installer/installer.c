@@ -33,7 +33,7 @@
  * hand never acts on it; without one (or with another word) nothing is changed. No closing
  * alert: the app quits by itself, and the .out's last line says what happened ("RESULT ...").
  *
- * Output: Installer-<run id>.out next to the app (runid.c).
+ * Output: <app name>-<run id>.out next to the app (runid.c; "Installer" if the name is unusable).
  */
 #include <Quickdraw.h>
 #include <Fonts.h>
@@ -378,6 +378,10 @@ static void uninstall(Handle mine, Handle parked, Handle ours)
         say("Cancelled. Nothing was changed.");
         return;
     }
+    if (!parked && g_unatt) {       /* never leave the Mac with no Ethernet driver when nobody is there */
+        say("No DaynaPORT driver was kept; not removing the only Ethernet driver unattended. Nothing was changed.");
+        return;
+    }
     if (!parked) {
         if (remove_res(mine, 1)) { say("Could not take out MoofPort's driver. Nothing was changed."); return; }
         if (write_system()) { say("Writing the System file failed. Restore your backup before restarting."); return; }
@@ -432,8 +436,10 @@ static void run(void)
     short id;
     ResType t;
 
+    /* The cfg is read and deleted first, so no failure below leaves one behind for a later run. */
+    if (g_unatt) g_auto = read_auto();
     if (find_system()) { say("Could not find the System file."); return; }
-    if (g_unatt && (g_auto = read_auto()) == A_NONE) {
+    if (g_unatt && g_auto == A_NONE) {
         say("Unattended run without a valid MoofPortInstall.cfg (install or uninstall). Nothing was changed.");
         return;
     }
@@ -467,14 +473,28 @@ static void run(void)
     }
 }
 
+/* The .out is named after the running application ("MoofPortInstall", "MoofPortDiag", or whatever the
+ * file is called on the Mac): MoofAgent waits for "<tool>-<id>.out" of the tool it launched. "Installer"
+ * only when CurApName is unusable. */
+static const char *own_name(char *buf)
+{
+    const unsigned char *n = (const unsigned char *)0x910;      /* CurApName, a Pascal string */
+    int i, len = n[0];
+    if (len < 1 || len > 20) return "Installer";
+    for (i = 0; i < len; i++) buf[i] = (char)n[i + 1];
+    buf[len] = 0;
+    return buf;
+}
+
 int main(void)
 {
     Str255 ps;
+    char tool[24];
 
     MaxApplZone();
     InitGraf(&qd.thePort); InitFonts(); InitWindows(); InitMenus(); TEInit();
     InitDialogs(0); InitCursor();
-    runid_name("Installer", ".out", g_outname);
+    runid_name(own_name(tool), ".out", g_outname);
     FSDelete(g_outname, 0);
     Create(g_outname, 0, 'ttxt', 'TEXT');
     if (FSOpen(g_outname, 0, &g_outref)) g_outref = -1;
