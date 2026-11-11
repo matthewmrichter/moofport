@@ -26,6 +26,13 @@
  * driver that is open right now (AppleTalk or MacTCP) is removed from the resource map only, not
  * from memory, so it keeps working until the restart.
  *
+ * Unattended (MoofAgent's runs, runid_unattended): the text file "MoofPortInstall.cfg" next to
+ * the app says what to do, first word "install" or "uninstall" (moofctl.py switch). The alerts
+ * are answered without showing them: install = Install / Update, uninstall = Uninstall, or
+ * Cancel when DaynaPORT is already the driver. The cfg is deleted once read, so a later run by
+ * hand never acts on it; without one (or with another word) nothing is changed. No closing
+ * alert: the app quits by itself, and the .out's last line says what happened ("RESULT ...").
+ *
  * Output: Installer-<run id>.out next to the app (runid.c).
  */
 #include <Quickdraw.h>
@@ -48,9 +55,9 @@ QDGlobals qd;
  * "send-fix": branch send-fix's driver (queued EWrites, bounded poll ticks, blind frame writes);
  * the release thread sets the real version when it takes the change. */
 #ifdef MP_DIAG
-#define MP_INST_VER "1.0 diagnostic"
+#define MP_INST_VER "1.0 perf-harness diagnostic"
 #else
-#define MP_INST_VER "1.0"
+#define MP_INST_VER "1.0 perf-harness"
 #endif
 #define T_DRVR     'DRVR'
 #define T_PARKED   'DRVx'           /* DaynaPORT's driver while MoofPort is installed */
@@ -62,6 +69,11 @@ QDGlobals qd;
 #define SLACK      (32L * 1024)     /* free space wanted beyond the new resources */
 
 enum { kResult = 128, kAskInstall = 129, kAskUninstall = 130 };
+
+/* Unattended: what MoofPortInstall.cfg asked for (A_NONE: nothing, or attended). */
+enum { A_NONE, A_INSTALL, A_UNINSTALL };
+static int g_auto = A_NONE;
+static int g_unatt;
 
 static short g_outref = -1;
 static Str255 g_outname;
@@ -228,10 +240,20 @@ static int init_versions(int disable)
 
 /* ---- install / uninstall ---- */
 
-/* Show alert `alrt` with `text`; returns the item hit (1 = the first button). */
+/* Show alert `alrt` with `text`; returns the item hit (1 = the first button). Unattended, the
+ * cfg answers instead: Install (1) or Cancel (2) at the install alert, Update (1) or Uninstall
+ * (3) at the installed one. */
 static short ask_item(short alrt, const char *text)
 {
     Str255 p;
+    if (g_unatt) {
+        short hit = alrt == kAskInstall ? (g_auto == A_INSTALL ? 1 : 2) : (g_auto == A_INSTALL ? 1 : 3);
+        LOG("unattended (MoofPortInstall.cfg %s): alert %d answered with item %d\r",
+            g_auto == A_INSTALL ? "install" : "uninstall", (int)alrt, (int)hit);
+        if (alrt == kAskInstall && g_auto == A_UNINSTALL)
+            LOG("already DaynaPORT (or no MoofPort installed), nothing to do\r");
+        return hit;
+    }
     ctop(text, p);
     ParamText(p, (ConstStr255Param)"\p", (ConstStr255Param)"\p", (ConstStr255Param)"\p");
     return Alert(alrt, 0);
@@ -252,7 +274,11 @@ static void install_fresh(Handle ours)
     sprintf(q, "No DaynaPORT driver is installed. Install MoofPort as the Ethernet driver (.ENET0) "
                "in the System file?%s Restart afterwards.",
             inits ? " The MoofPort extension in the System Folder will be turned off." : "");
-    if (!ask(kAskInstall, q)) { say("Cancelled. Nothing was changed."); return; }
+    if (!ask(kAskInstall, q)) {
+        say(g_auto == A_UNINSTALL ? "No MoofPort and no DaynaPORT driver installed, nothing to "
+                                    "uninstall. Nothing was changed." : "Cancelled. Nothing was changed.");
+        return;
+    }
     if (!(mine = add_copy(ours, T_DRVR, ENET_ID, (ConstStr255Param)"\p.ENET0", ATTR_DRVR))) {
         say("Could not add MoofPort's driver. Nothing was changed.");
         return;
@@ -280,7 +306,11 @@ static void install(Handle dayna, Handle ours)
     sprintf(q, "Install MoofPort as the Ethernet driver (.ENET0) in the System file? DaynaPORT's "
                "driver is kept for Uninstall.%s Restart afterwards.",
             inits ? " The MoofPort extension in the System Folder will be turned off." : "");
-    if (!ask(kAskInstall, q)) { say("Cancelled. Nothing was changed."); return; }
+    if (!ask(kAskInstall, q)) {
+        say(g_auto == A_UNINSTALL ? "Already DaynaPORT, nothing to do. Nothing was changed."
+                                  : "Cancelled. Nothing was changed.");
+        return;
+    }
 
     GetResInfo(dayna, &id, &t, name);
     if (!(parked = add_copy(dayna, T_PARKED, ENET_ID, name, attrs))) {
@@ -372,6 +402,29 @@ static void uninstall(Handle mine, Handle parked, Handle ours)
     say("DaynaPORT's driver is back. Restart the Mac to use it.");
 }
 
+/* Unattended: read and delete MoofPortInstall.cfg. Returns A_INSTALL, A_UNINSTALL or A_NONE. */
+static int read_auto(void)
+{
+    short r;
+    long len = 15;
+    char buf[16];
+    int i = 0, a = A_NONE;
+    if (FSOpen((ConstStr255Param)"\pMoofPortInstall.cfg", 0, &r) != noErr) {
+        LOG("unattended: no MoofPortInstall.cfg\r");
+        return A_NONE;
+    }
+    if (FSRead(r, &len, (Ptr)buf) != noErr && len <= 0) len = 0;
+    FSClose(r);
+    FSDelete((ConstStr255Param)"\pMoofPortInstall.cfg", 0);
+    buf[len] = 0;
+    while (i < len && (buf[i] == ' ' || buf[i] == '\t')) i++;
+    if (!strncmp(buf + i, "uninstall", 9)) a = A_UNINSTALL;
+    else if (!strncmp(buf + i, "install", 7)) a = A_INSTALL;
+    LOG("unattended: MoofPortInstall.cfg says \"%.*s\" (read and deleted)\r",
+        (int)strcspn(buf + i, "\r\n"), buf + i);
+    return a;
+}
+
 static void run(void)
 {
     Handle ours, drvr, parked;
@@ -380,6 +433,10 @@ static void run(void)
     ResType t;
 
     if (find_system()) { say("Could not find the System file."); return; }
+    if (g_unatt && (g_auto = read_auto()) == A_NONE) {
+        say("Unattended run without a valid MoofPortInstall.cfg (install or uninstall). Nothing was changed.");
+        return;
+    }
     ours = Get1Resource(T_OURS, 128);            /* this app's own file is current */
     if (!ours) { say("This copy of the installer is damaged (no MoofPort driver inside)."); return; }
     describe("MoofPort driver in this installer", ours);
@@ -423,13 +480,15 @@ int main(void)
     if (FSOpen(g_outname, 0, &g_outref)) g_outref = -1;
     else SetEOF(g_outref, 0);
     wr("MoofPortInstall " MP_INST_VER "\r");
+    g_unatt = runid_unattended();
 
     run();
 
+    LOG("RESULT %s\r", g_msg);
     if (g_outref >= 0) { FSClose(g_outref); g_outref = -1; }
     FlushVol(0, 0);
     ctop(g_msg, ps);
     ParamText(ps, (ConstStr255Param)"\p", (ConstStr255Param)"\p", (ConstStr255Param)"\p");
-    Alert(kResult, 0);
+    if (!g_unatt) Alert(kResult, 0);
     return 0;
 }

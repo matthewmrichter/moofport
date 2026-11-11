@@ -45,3 +45,10 @@ foreach(src ${MP_TEST_MAINS})
     MP_MEM_CAP=${MP_MEM_CAP} MP_RX_SLOTS=${MP_RX_SLOTS} MP_TX_SLOTS=${MP_TX_SLOTS})
   add_test(NAME ${name} COMMAND ${name})
 endforeach()
+
+# the moofctl plugin (scripts/moofctl-plugins/moofport.py); exits 77 (ctest "Skipped") when moofagent's moofctl.py is not found
+find_package(Python3 COMPONENTS Interpreter)
+if(Python3_Interpreter_FOUND)
+  add_test(NAME test_moofport_plugin COMMAND ${Python3_EXECUTABLE} -I ${CMAKE_SOURCE_DIR}/tests/test_moofport_plugin.py)
+  set_tests_properties(test_moofport_plugin PROPERTIES SKIP_RETURN_CODE 77)
+endif()

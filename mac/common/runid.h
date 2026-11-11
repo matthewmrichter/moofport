@@ -7,4 +7,8 @@
  * Pascal string of at most 31 characters (HFS). Call after InitDialogs. Returns `out`. */
 unsigned char *runid_name(const char *tool, const char *ext, unsigned char *out);
 
+/* After runid_name: 1 if "MoofPort Run" started with "!!" (MoofAgent's runs): skip the closing
+ * alert and quit, so nothing waits for a click. */
+int runid_unattended(void);
+
 #endif

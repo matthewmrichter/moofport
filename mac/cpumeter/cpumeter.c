@@ -94,6 +94,6 @@ int main(void)
     ps[0] = (unsigned char)n;
     memcpy(ps + 1, line, n);
     ParamText(ps, (ConstStr255Param)"\p", (ConstStr255Param)"\p", (ConstStr255Param)"\p");
-    Alert(128, 0);
+    if (!runid_unattended()) Alert(128, 0);
     return 0;
 }
