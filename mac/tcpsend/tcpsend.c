@@ -957,10 +957,14 @@ static void run_mode(char m)
     }
 }
 
+static int g_batch_fail;          /* no setting could be applied: the run is a FAIL */
+
 static void batch(void)
 {
     char list[128], *names[10], *p;
-    int ns = 0, s, i, k = 0, total, cnt[128];
+    int ns = 0, s, i, k = 0, total, cnt[128], ran = 0;
+    char skipped[128];
+    skipped[0] = 0;
     strcpy(list, g_mp ? g_settings : "dayna");
     for (p = strtok(list, " "); p && ns < 10; p = strtok(0, " ")) names[ns++] = p;
     total = ns * (int)strlen(g_modes);
@@ -969,12 +973,15 @@ static void batch(void)
         LOG("== SETTING %s\r", names[s]);
         if (g_mp) {
             int r = apply_setting(names[s]);
-            if (r) { LOG("setting %s: not applied (%d), skipped\r", names[s], r); k += (int)strlen(g_modes); continue; }
+            if (r) { LOG("setting %s: not applied (%d), skipped\r", names[s], r); k += (int)strlen(g_modes);
+                if (strlen(skipped) + strlen(names[s]) + 2 < sizeof skipped) { strcat(skipped, " "); strcat(skipped, names[s]); }
+                continue; }
             enet_status(MP_STATUS_STATS, &g_s0, (int16_t)sizeof g_s0);
             LOG("tune: flags %02x early %u flags2 %02x blind_tx %u poll %u/%u/%u ms\r", g_s0.tune.flags,
                 g_s0.tune.early, g_s0.tune.flags2, g_s0.tune.blind_tx, g_s0.tune.burst_ms,
                 g_s0.tune.mid_ms, g_s0.tune.idle_ms);
         }
+        ran++;
         memset(cnt, 0, sizeof cnt);
         for (i = 0; g_modes[i]; i++) {
             char m = g_modes[i];
@@ -986,6 +993,8 @@ static void batch(void)
         }
     }
     udp_close();
+    if (!ran) g_batch_fail = 1;
+    else if (skipped[0]) LOG("skipped settings:%s\r", skipped);
 }
 #endif
 
@@ -1034,6 +1043,10 @@ static void read_cfg(void)
                         long v;
                         strncpy(g_rbuf_txt, p + 5, sizeof g_rbuf_txt - 1);
                         g_rbuf_txt[strcspn(g_rbuf_txt, "\r\n")] = 0;
+                        {
+                            size_t n = strlen(g_rbuf_txt);
+                            while (n > 0 && (g_rbuf_txt[n - 1] == ' ' || g_rbuf_txt[n - 1] == '\t')) g_rbuf_txt[--n] = 0;
+                        }
                         v = strtol(g_rbuf_txt, &e, 10);
                         if (e == g_rbuf_txt || *e || v < RBUF_MIN || v > RBUF_MAX) g_rbuf_bad = 1;
                         else g_rbuf = v;
@@ -1121,6 +1134,9 @@ int main(void)
     }
     clk_stop();
     LOG("end tick %lu\r", ticks());
+#ifdef MP_BATCH
+    if (g_batch_fail) wr("RESULT FAIL no setting could be applied\r"); else
+#endif
     wr("RESULT DONE\r");
 fin:
     if (g_outref >= 0) { FSClose(g_outref); g_outref = -1; }
