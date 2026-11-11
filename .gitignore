@@ -43,6 +43,8 @@ docs/dev/hwsend*.md
 docs/dev/PLAN-PROPOSALS-hw1.md
 docs/poll-path*
 scripts/hwsend*
+!scripts/hwsend-batch.py
+!scripts/hwsend-acks.py
 MoofBatch.cfg
 
 # personal agent notes

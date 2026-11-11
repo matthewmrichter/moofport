@@ -324,7 +324,8 @@ static const uint8_t *ipp_driver(void)
     return 0;
 }
 
-/* MoofTCP's driver: the open entry is at 0x18 and starts "moveq #0,d0; bra.s" (mt_units_is_moof). */
+/* copied from mooftcp mac/glue/mt_units.h (mt_units_is_moof); change there first.
+ * MoofTCP's driver: the open entry is at 0x18 and starts "moveq #0,d0; bra.s" (mt_units_is_moof). */
 static int is_moof(const uint8_t *drv)
 {
     return drv && drv[8] == 0x00 && drv[9] == 0x18 && drv[24] == 0x70 && drv[25] == 0x00 &&
