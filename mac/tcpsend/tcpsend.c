@@ -36,7 +36,9 @@
  * MoofBatch (the same source built with MP_BATCH, hwsend11): one run id, then every MoofTune
  * setting in "MoofBatch.cfg"'s second line ("settings new oldhush early0 noinline", the
  * default) in turn, set through the driver's MP_CTL_TUNE with no restart, and the modes for each
- * (default EACRAC). With DaynaPORT (no MoofPort counters) it runs the modes once as "dayna".
+ * (default EACRAC; "keep" applies nothing and uses what the driver has; the levers rx4, chase1,
+ * steady, steadyrx4, steadyack are mac/common/mp_levers.h, shared with MoofTune).
+ * With DaynaPORT (no MoofPort counters) it runs the modes once as "dayna".
  * Before and after each test it sends "MARK <run> <setting> <n> <test> start|end" by UDP to the
  * PC's port 17040 (testnet.py logs it; scripts/hwsend-batch.py splits the capture by it). A
  * small window shows the setting, test N of M and the last result; it is redrawn only between
@@ -62,6 +64,7 @@
 #include <stdint.h>
 #include "runid.h"
 #include "mp_drv.h"
+#include "mp_levers.h"
 #include "mp_diag.h"
 
 QDGlobals qd;
@@ -876,14 +879,19 @@ static int apply_setting(const char *setting)
     if (n >= sizeof name) return -2;
     memcpy(name, setting, n);
     name[n] = 0;
+    if (!strcmp(name, "keep") && !polled) {
+        /* nothing applied: the driver keeps what it has (MoofTune, or the last setting), so a
+         * sweep driven from MoofTune can be measured */
+        LOG("keep: unchanged\r");
+        return 0;
+    }
     if (!enet_status(MP_STATUS_STATS, &g_s0, (int16_t)sizeof g_s0)) return -1;
     t = g_s0.tune;
     t.version = MP_TUNE_VERSION;
-    t.burst_ms = 5; t.hold_ms = 60; t.mid_ms = 17; t.quiet_ms = 2000; t.idle_ms = 51;
-    t.step_ms = 17; t.busy_ms = 2;
-    t.blind = 1; t.verify = 0; t.blind_tx = 1; t.flags = 0; t.early = MP_EARLY_OFF;
-    t.pad = 0; t.flags2 = 0; t.pad2 = 0;
-    if (!strcmp(name, "new")) {
+    mp_tune_defaults(&t);
+    if (mp_lever_preset(&t, name)) {
+        /* rx4, chase1, steady, steadyrx4, steadyack: mp_levers.h, the same as MoofTune's presets */
+    } else if (!strcmp(name, "new")) {
         /* the hwsend11 defaults: inline, first poll 5 ms after it, reply pause, no re-poll */
     } else if (!strcmp(name, "oldhush")) {
         t.flags = MP_TUNE_HUSH; t.flags2 = MP_TUNE2_NOPAUSE | MP_TUNE2_REPOLL;
@@ -897,12 +905,6 @@ static int apply_setting(const char *setting)
         t.flags2 = MP_TUNE2_NOPAUSE;
     } else if (!strcmp(name, "repoll")) {
         t.flags2 = MP_TUNE2_REPOLL;
-    } else if (!strcmp(name, "steady")) {
-        /* DaynaPORT's rhythm (MoofTune steady): a poll every 16 ms at every level, one frame per
-         * READ, no yield cut, chase, pause or early poll after an inline WRITE */
-        t.burst_ms = t.mid_ms = t.idle_ms = 16; t.step_ms = 0;
-        t.flags = MP_TUNE_NOYIELD | MP_TUNE_NOCHASE;
-        t.flags2 = MP_TUNE2_NOPAUSE | MP_TUNE2_STEADY;
     } else {
         return -2;
     }

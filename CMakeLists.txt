@@ -45,6 +45,11 @@ foreach(src ${MP_TEST_MAINS})
     MP_MEM_CAP=${MP_MEM_CAP} MP_RX_SLOTS=${MP_RX_SLOTS} MP_TX_SLOTS=${MP_TX_SLOTS})
   add_test(NAME ${name} COMMAND ${name})
 endforeach()
+# test_levers: the MP_CTL_TUNE lever presets shared by MoofTune and MoofBatch (mac/common/mp_levers.h)
+if(TARGET test_levers)
+  target_include_directories(test_levers PRIVATE ${CMAKE_SOURCE_DIR}/mac/common ${CMAKE_SOURCE_DIR}/mac/driver)
+  target_compile_definitions(test_levers PRIVATE MP_SRC_DIR="${CMAKE_SOURCE_DIR}")
+endif()
 
 # the moofctl plugin (scripts/moofctl-plugins/moofport.py); exits 77 (ctest "Skipped") when moofagent's moofctl.py is not found
 find_package(Python3 COMPONENTS Interpreter)
