@@ -63,7 +63,7 @@ you can read, tests, and somebody to fix it.
 - MacTCP 2.1, AppleTalk with EtherTalk, or both.
 - DaynaPORT software is not necessary. If DaynaPORT SCSI/Link is installed, MoofPort replaces its
   driver in the System file. MoofPort keeps the DaynaPORT driver for Uninstall.
-- System memory: MoofPort uses 17,528 bytes. The DaynaPORT driver uses 16,554 bytes.
+- System memory: MoofPort uses 17,560 bytes. The DaynaPORT driver uses 16,554 bytes.
 
 ### EtherTalk without DaynaPORT disks
 
@@ -245,7 +245,7 @@ in [TESTING_METHODOLOGY.md](TESTING_METHODOLOGY.md).
   alternating in blocks and all 16 copies checked byte for byte. Wi-Fi retries slowed the uploads for
   both drivers in that session. Without the retry pauses, MoofPort copied at 32.6 / 25.5 KB/s and
   DaynaPORT at 28.5 / 20.0 KB/s.
-- **Memory:** MoofPort's 17,528 bytes is what the Mac's `HeapInfoOpen` test reports; DaynaPORT's
+- **Memory:** MoofPort's 17,560 bytes is what the Mac's `HeapInfoOpen` test reports; DaynaPORT's
   16,554 was measured on the hardware.
 
 Receiving and file sharing are faster; sending and latency are level with DaynaPORT.

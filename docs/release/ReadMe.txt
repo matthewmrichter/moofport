@@ -34,7 +34,7 @@ REQUIREMENTS
     SCSI/Link is installed, MoofPort replaces its driver in the
     System file. MoofPort keeps the DaynaPORT driver for
     Uninstall.
-  - System memory: MoofPort uses 17,528 bytes. The DaynaPORT
+  - System memory: MoofPort uses 17,560 bytes. The DaynaPORT
     driver uses 16,554 bytes.
 
 
@@ -153,13 +153,19 @@ MoofTune changes the MoofPort timing until the next restart.
      name.
   3. Click OK.
 
-  default   The MoofPort 1.0 settings (the settings after a
-            restart).
+  default   The MoofPort 1.1 settings (the settings after a
+            restart): check the network every 16 ms, and once
+            more 2 ms after each packet MoofPort sends. The
+            same as "new" and "steadyack".
+  old       The MoofPort 1.0 settings, for comparison: check
+            every 5 ms during traffic, every 17 ms (51 ms when
+            idle) otherwise, and 5 ms after each packet sent.
   noinline  Send each packet in the next network check, not at
             once (the 1.0b1 method). Fewer lost packets in
             some tests, slower one-at-a-time sends.
   steady    Check the network every 16 ms, one packet at a
-            time, as DaynaPORT does. Receive is approximately
+            time, with no extra check after a send, as
+            DaynaPORT does. Receive is approximately
             30% slower.
   tick      Check the network once per tick, always (0.3d3).
   txpolled  Handshake every byte of each packet that goes to
