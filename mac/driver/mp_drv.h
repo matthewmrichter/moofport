@@ -8,8 +8,8 @@
 /* ---- The MP_CTL_TUNE contract (stable; MoofTCP 1.1 relies on it) ----
  *
  * Detecting MoofPort and its version: issue Status csCode MP_STATUS_STATS (0x4D50) on the .ENET0 driver
- * with ePointer = a buffer and eBuffSize = sizeof(MpStats) (set it; eDataSize is not used on this
- * path). The driver answers statusErr, filling nothing, unless eBuffSize >= its own sizeof(MpStats)
+ * with ePointer = a buffer and eBuffSize = sizeof(MpStats) (set it; eDataSize is ignored on input and
+ * set to sizeof(MpStats) on success). The driver answers statusErr, filling nothing, unless eBuffSize >= its own sizeof(MpStats)
  * (176 bytes for MP_STATS_VERSION 8 on the 68k, natural 2-byte alignment). So the client must supply
  * a buffer at least as large as the driver's MpStats; a client built against a smaller MpStats gets
  * statusErr from a newer MoofPort, which looks the same as DaynaPORT (statusErr or another error
@@ -22,9 +22,10 @@
  * Applying a tune: Control csCode MP_CTL_TUNE (0x4D54), ePointer = an MpTune with every field set
  * (the call applies all of them; there is no partial update) and version = MP_TUNE_VERSION. The driver
  * answers controlErr, applying nothing, when the version differs or ePointer is NULL, and noErr
- * otherwise. The values last until the next restart. A driver close and reopen does NOT reset
- * them (mp_drv_open returns early when the driver is already open); only a restart returns the
- * driver to mp_tune_boot, so a client that wants a particular tune applies it whenever it opens.
+ * otherwise. The values last until the next restart or the next driver reopen: a close
+ * followed by an open runs the full open path (mp_drv_close clears opened) and re-applies
+ * mp_tune_boot, so the tune is back to 1.0's values. A client that wants another tune must
+ * re-apply it after every reopen (opening an already-open driver does nothing and keeps the tune).
  * Layout: the MpTune struct below, field order and widths as declared, big-endian, no padding beyond
  * the declared pad bytes (68k natural alignment; the struct is 24 bytes). Read the values back from
  * MpStats.tune.

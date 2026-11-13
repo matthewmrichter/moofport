@@ -167,7 +167,7 @@ typedef struct MpDrv {
     uint8_t early;                /* MP_EARLY_*: how an inline WRITE's reply is chased (MoofTune chase*) */
     uint8_t cms;                  /* the chase's spacing: ack_ms after a tick's WRITE, 1-2 after inline */
     uint8_t flags2;               /* MpTune.flags2: MP_TUNE2_NOPAUSE, MP_TUNE2_REPOLL */
-    uint8_t tflags;               /* MpTune.flags as last set (the boot tune: NOYIELD|NOCHASE|ACK2 = 0x1C), for Status */
+    uint8_t tflags;               /* MpTune.flags as last set (the boot tune: 0; steadyack: NOYIELD|NOCHASE|ACK2 = 0x1C), for Status */
     uint32_t kicks, v_ok, v_bad, v_big;
     struct EPB *parked;           /* an EWrite waiting for a free TX slot */
     void *dce;                    /* ... its DCE, for IODone */
