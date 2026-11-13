@@ -6,7 +6,7 @@
  * burst, hold, mid, quiet, idle, step, busy (ms), blind, blind_tx, verify, batch, chase, yield,
  * inline (0/1), early (ms after an inline WRITE: 1, 2, 0 = the usual poll), rx (frames per tick, 2 or 4), ack (ms after a WRITE, 2 or 5), hush (0/1: 15 ms); unnamed keys
  * keep their current value), else from the run id, which then names a preset:
- *     default   MoofPort 1.1's boot defaults, the same as new and steadyack (see mp_levers.h); old is 1.0's:
+ *     default   the boot defaults, the same as new and old: MoofPort 1.0's values (see mp_levers.h); steadyack is what MoofTCP 1.1 applies:
  *               the 'defaults' in the older presets below are 1.0's (decision 6): 5 ms for 60 ms after traffic, one tick
  *               until 2 s of quiet, then out to three ticks; blind reads, blind frame writes
  *               (send-fix; 1.0b1 wrote polled), batched WRITEs, 2 frames per tick, poll 5 ms after a
@@ -209,7 +209,7 @@ static int preset(MpTune *t, const unsigned char *outname)
     if (n <= 0 || n >= (int)sizeof id) return 0;
     memcpy(id, outname + 1 + 9, (size_t)n);
     id[n] = 0;
-    if (!strcmp(id, "default")) { mp_tune_defaults(t); return 1; }   /* 1.1: = new = steadyack */
+    if (!strcmp(id, "default")) { mp_tune_defaults(t); return 1; }   /* = new = old = the boot tune (1.0's values) */
     if (!strcmp(id, "tick")) { defaults(t); tick(t); return 1; }
     if (!strcmp(id, "phase1")) { defaults(t); tick(t); t->blind = 0; return 1; }
     if (!strcmp(id, "burst")) { defaults(t); tick(t); t->burst_ms = 5; t->hold_ms = 60; return 1; }

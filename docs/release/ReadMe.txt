@@ -153,13 +153,14 @@ MoofTune changes the MoofPort timing until the next restart.
      name.
   3. Click OK.
 
-  default   The MoofPort 1.1 settings (the settings after a
-            restart): check the network every 16 ms, and once
-            more 2 ms after each packet MoofPort sends. The
-            same as "new" and "steadyack".
-  old       The MoofPort 1.0 settings, for comparison: check
-            every 5 ms during traffic, every 17 ms (51 ms when
-            idle) otherwise, and 5 ms after each packet sent.
+  default   The settings after a restart, the same as 1.0's:
+            check every 5 ms during traffic, every 17 ms
+            (51 ms when idle) otherwise, and 5 ms after each
+            packet sent. The same as "new" and "old".
+  steadyack Check the network every 16 ms, and once more 2 ms
+            after each packet sent. MoofTCP 1.1 applies this
+            setting itself when it opens MoofPort; under
+            MacTCP it was slower than "default".
   noinline  Send each packet in the next network check, not at
             once (the 1.0b1 method). Fewer lost packets in
             some tests, slower one-at-a-time sends.

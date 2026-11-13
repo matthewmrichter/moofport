@@ -82,13 +82,13 @@
 
 #define RX_SLOTS   3              /* PLAN 2.4 default: 3 RX + 2 TX */
 #define TX_SLOTS   2
-/* The boot-time tune is mp_tune_boot() in mp_drv.h (1.1: "steadyack", a poll every 16 ms, a quick poll
- * 2 ms after an inline WRITE); the 1.0 values (5 ms bursts, 17/51 ms ticks) are MoofTune/MoofBatch "old".
+/* The boot-time tune is mp_tune_boot() in mp_drv.h: the 1.0 values (5 ms bursts, 17/51 ms ticks),
+ * MoofTune/MoofBatch "old" = "new"; "steadyack" (16 ms polls, a quick poll after a WRITE) is applied by MoofTCP 1.1.
  * MP_CTL_TUNE changes them at run time (MoofTune presets). */
 #define TX_MS      1              /* an EWrite brings the next tick this close */
 #define ACK_MS     5              /* the first poll after a WRITE, and no READ sooner, when MP_TUNE_ACK2
                                      is off (hwsend5: READs 2 ms after a WRITE went with lost frames in
-                                     1.0; the 1.1 default is ACK2, steadyack, hardware-paired in 1.1d1) */
+                                     1.0; steadyack, which MoofTCP 1.1 applies, sets ACK2) */
 #define HUSH_MS    15             /* MoofTune hush (hwsend8): no poll this long after any reply */
 #define PAUSE_MS   12             /* the reply pause: under MacTCP's ~13.5 ms to its next send */
 #define CHASE_N    3              /* then up to this many more polls ack_ms apart until it comes */

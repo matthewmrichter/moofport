@@ -37,7 +37,7 @@
  * setting in "MoofBatch.cfg"'s second line ("settings new oldhush early0 noinline", the
  * default) in turn, set through the driver's MP_CTL_TUNE with no restart, and the modes for each
  * (default EACRAC; "keep" applies nothing and uses what the driver has; the levers new
- * (MoofPort 1.1's boot defaults = steadyack), old (1.0's defaults), rx4, chase1, steady, steadyrx4,
+ * (the boot defaults = old = 1.0's values), old, rx4, chase1, steady, steadyrx4,
  * steadyack are mac/common/mp_levers.h, shared with MoofTune; oldhush, early0, noinline, old10,
  * nopause, repoll change the 1.0 defaults).
  * With DaynaPORT (no MoofPort counters) it runs the modes once as "dayna".
@@ -892,7 +892,7 @@ static int apply_setting(const char *setting)
     t.version = MP_TUNE_VERSION;
     mp_tune_old(&t);        /* the older settings below change the 1.0 defaults */
     if (mp_lever_preset(&t, name)) {
-        /* new (the 1.1 defaults), old (1.0's), rx4, chase1, steady, steadyrx4, steadyack:
+        /* new and old (the boot defaults, 1.0's values), rx4, chase1, steady, steadyrx4, steadyack:
          * mp_levers.h, the same as MoofTune's presets */
     } else if (!strcmp(name, "oldhush")) {
         t.flags = MP_TUNE_HUSH; t.flags2 = MP_TUNE2_NOPAUSE | MP_TUNE2_REPOLL;

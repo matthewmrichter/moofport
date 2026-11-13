@@ -5,6 +5,37 @@
 
 #include "mp_dev.h"
 
+/* ---- The MP_CTL_TUNE contract (stable; MoofTCP 1.1 relies on it) ----
+ *
+ * Detecting MoofPort and its version: issue Status csCode MP_STATUS_STATS (0x4D50) on the .ENET0 driver
+ * with ePointer = a buffer of sizeof(MpStats) bytes. A driver that is not MoofPort (DaynaPORT) answers
+ * statusErr (or another error) and leaves the buffer alone; MoofPort returns noErr and fills it, and
+ * MpStats.version (MP_STATS_VERSION) then says which MpStats layout it is, MpStats.tune.version which
+ * MpTune layout it applies. Read tune.version before sending anything: send MP_CTL_TUNE only when it
+ * equals the MP_TUNE_VERSION you were built with.
+ *
+ * Applying a tune: Control csCode MP_CTL_TUNE (0x4D54), ePointer = an MpTune with every field set
+ * (the call applies all of them; there is no partial update) and version = MP_TUNE_VERSION. The driver
+ * answers controlErr, applying nothing, when the version differs or ePointer is NULL, and noErr
+ * otherwise. The values last at most until the next restart (the driver boots with mp_tune_boot).
+ * Layout: the MpTune struct above, field order and widths as declared, big-endian, no padding beyond
+ * the declared pad bytes (68k natural alignment; the struct is 24 bytes). Read the values back from
+ * MpStats.tune.
+ *
+ * Bump rules: MP_TUNE_VERSION changes whenever MpTune's size, field order, field width or a field's
+ * meaning changes, and when a flag bit changes meaning. Adding a new flag bit in a previously unused
+ * bit, or a new preset, does not change the layout but is a new version too when the driver would
+ * treat the old value differently; when in doubt, bump. A driver never accepts a version other than
+ * its own, so a client built for another version gets controlErr and must leave the driver alone.
+ * MP_STATS_VERSION follows the same rule for MpStats. Fields are only ever appended, never reordered.
+ *
+ * "steadyack" for MoofTCP 1.1 (what MoofTune/MoofBatch call steadyack, see mac/common/mp_levers.h):
+ *   version = MP_TUNE_VERSION; burst_ms = mid_ms = idle_ms = 16; hold_ms = 60; quiet_ms = 2000;
+ *   step_ms = 0; busy_ms = 2; blind = 1; verify = 0; blind_tx = 1;
+ *   flags = MP_TUNE_NOYIELD | MP_TUNE_NOCHASE | MP_TUNE_ACK2; early = MP_EARLY_OFF; pad = 0;
+ *   flags2 = MP_TUNE2_NOPAUSE (MP_TUNE2_STEADY off); pad2 = 0.
+ */
+
 #define MP_STATUS_STATS  0x4D50      /* 'MP' */
 #define MP_STATS_VERSION 8
 
@@ -53,19 +84,20 @@ typedef struct MpTune {
                                         ack_ms (the default since hwsend11: the ACK is back 3-5 ms
                                         after the WRITE, so earlier READs come back empty) */
 
-/* The tune the driver starts with (MoofPort 1.1; "steadyack" in MoofBatch/MoofTune, which is also what
- * their "new" and "default" mean): a poll every 16 ms whatever the traffic (burst = mid = idle), up to 2
- * frames per READ, no yield cut, chase or reply pause, one quick poll 2 ms after an inline WRITE.
- * The 1.0 defaults (5 ms bursts, 17/51 ms ticks, 5 ms after a WRITE) are the tools' "old". The driver
- * applies this at open; the tools start from it, so Status shows exactly it until a tool changes it. */
+/* The tune the driver starts with: MoofPort 1.0's defaults (5 ms bursts, 17/51 ms ticks, 5 ms after a
+ * WRITE; MoofTune/MoofBatch call them "old", "new" and "default"). 1.1 kept them after hardware runs
+ * under MacTCP found "steadyack" (a poll every 16 ms, 2 ms after an inline WRITE) worse there; MoofTCP
+ * 1.1 switches MoofPort to steadyack itself with MP_CTL_TUNE when it opens .ENET0. The driver applies
+ * this at open; the tools start from it, so Status shows exactly it until someone changes it. */
 static inline void mp_tune_boot(MpTune *t)
 {
-    t->burst_ms = t->mid_ms = t->idle_ms = 16; t->hold_ms = 60; t->quiet_ms = 2000;
-    t->step_ms = 0; t->busy_ms = 2;
+    t->version = MP_TUNE_VERSION;
+    t->burst_ms = 5; t->hold_ms = 60; t->mid_ms = 17; t->quiet_ms = 2000; t->idle_ms = 51;
+    t->step_ms = 17; t->busy_ms = 2;
     t->blind = 1; t->verify = 0; t->blind_tx = 1;
-    t->flags = MP_TUNE_NOYIELD | MP_TUNE_NOCHASE | MP_TUNE_ACK2;
+    t->flags = 0;
     t->early = MP_EARLY_OFF; t->pad = 0;
-    t->flags2 = MP_TUNE2_NOPAUSE; t->pad2 = 0;
+    t->flags2 = 0; t->pad2 = 0;
 }
 
 typedef struct MpStats {

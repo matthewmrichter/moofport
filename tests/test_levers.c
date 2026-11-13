@@ -27,16 +27,15 @@ static void test_new_old_and_boot_default(void)
     mp_tune_boot(&boot);
     T_EQ(mp_lever_preset(&t, "new"), 1);
     T_EQ(memcmp(&t, &boot, sizeof t), 0);
-    T_EQ(mp_lever_preset(&s, "steadyack"), 1);
+    T_EQ(mp_lever_preset(&s, "old"), 1);
     T_EQ(memcmp(&s, &boot, sizeof s), 0);
-    T_EQ(boot.burst_ms, 16); T_EQ(boot.mid_ms, 16); T_EQ(boot.idle_ms, 16); T_EQ(boot.step_ms, 0);
+    /* 1.1 boots with 1.0's values (steadyack is applied by MoofTCP, not at boot) */
+    T_EQ(boot.version, MP_TUNE_VERSION);
+    T_EQ(boot.burst_ms, 5); T_EQ(boot.mid_ms, 17); T_EQ(boot.idle_ms, 51); T_EQ(boot.step_ms, 17);
     T_EQ(boot.hold_ms, 60); T_EQ(boot.quiet_ms, 2000); T_EQ(boot.busy_ms, 2);
-    T_EQ(boot.flags, MP_TUNE_NOYIELD | MP_TUNE_NOCHASE | MP_TUNE_ACK2);
-    T_EQ(boot.flags2, MP_TUNE2_NOPAUSE);
+    T_EQ(boot.flags, 0); T_EQ(boot.flags2, 0); T_EQ(boot.early, MP_EARLY_OFF);
     T_EQ(boot.blind, 1); T_EQ(boot.blind_tx, 1); T_EQ(boot.verify, 0);
-    T_EQ(mp_lever_preset(&t, "old"), 1);
-    T_EQ(t.burst_ms, 5); T_EQ(t.mid_ms, 17); T_EQ(t.idle_ms, 51); T_EQ(t.step_ms, 17);
-    T_EQ(t.flags, 0); T_EQ(t.flags2, 0); T_EQ(t.early, MP_EARLY_OFF);
+    T_EQ((int)sizeof(MpTune), 24);                  /* the documented ABI size (mp_drv.h) */
 }
 
 /* mp_drv.c applies mp_tune_boot at open (the only place that sets the tune at boot). */
@@ -77,6 +76,9 @@ static void test_steady_family(void)
     T_EQ(t.flags, MP_TUNE_NOYIELD | MP_TUNE_NOCHASE | MP_TUNE_ACK2);
     T_EQ(t.flags2, MP_TUNE2_NOPAUSE);               /* STEADY off: the driver keeps its post-WRITE poll */
     T_EQ(t.early, MP_EARLY_OFF);
+    /* the field values mp_drv.h documents for MoofTCP */
+    T_EQ(t.version, MP_TUNE_VERSION); T_EQ(t.hold_ms, 60); T_EQ(t.quiet_ms, 2000); T_EQ(t.busy_ms, 2);
+    T_EQ(t.blind, 1); T_EQ(t.blind_tx, 1); T_EQ(t.verify, 0); T_EQ(t.pad, 0); T_EQ(t.pad2, 0);
 }
 
 /* Both tools must use the shared header, and MoofBatch must name every setting this task adds. */
