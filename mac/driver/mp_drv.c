@@ -20,12 +20,11 @@
  *             tick comes at once. A tick stays well under one VBL period, so the
  *             60 Hz tick (Ticks, the System's timers) is not lost (hwsend: 65% lost when ticks
  *             ran 20-37 ms with 13 ms WRITEs inside MacTCP's interrupt-level EWrites).
- *             The interval comes from the core's mp_poll. The 1.1 boot tune (mp_tune_boot in
- *             mp_drv.h, "steadyack"): a tick every 16 ms whatever the traffic (no idle back-off),
- *             2 frames per READ, no yield cut or chase, and one quick poll 2 ms after an inline
- *             WRITE. The 1.0 defaults (decision 6) were 5 ms for 60 ms after traffic (hw6:
+ *             The interval comes from the core's mp_poll. The boot tune (mp_tune_boot in
+ *             mp_drv.h) is the 1.0 defaults (decision 6; 1.1 keeps them, MoofTCP 1.1 applies
+ *             "steadyack" itself): 5 ms for 60 ms after traffic (hw6:
  *             receive +9%), one tick until 2 s of quiet, then out to three ticks (hw6: 36% fewer
- *             empty polls on an idle Mac); they stay available as MoofTune/MoofBatch "old". Every
+ *             empty polls on an idle Mac); MoofTune/MoofBatch "old" is the same. Every
  *             empty READ costs about 3.3 ms of CPU on the Classic (hw4); a 3 ms burst cut TCP
  *             send to a third (hw3).
  *   EWrite    copies the frame into the TX ring and completes at once; the poll task sends it
@@ -766,7 +765,7 @@ int16_t mp_drv_open(void *pb, void *dce)
     memset(&d->calls, 0, sizeof d->calls);
     {
         MpTune t;
-        mp_tune_boot(&t);           /* 1.1: steadyack (mp_drv.h) */
+        mp_tune_boot(&t);           /* 1.0's values (mp_drv.h) */
         apply_tune(d, &t);
     }
     DIAG(mp_diag_open(&d->dg);)

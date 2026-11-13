@@ -8,26 +8,35 @@
 /* ---- The MP_CTL_TUNE contract (stable; MoofTCP 1.1 relies on it) ----
  *
  * Detecting MoofPort and its version: issue Status csCode MP_STATUS_STATS (0x4D50) on the .ENET0 driver
- * with ePointer = a buffer of sizeof(MpStats) bytes. A driver that is not MoofPort (DaynaPORT) answers
- * statusErr (or another error) and leaves the buffer alone; MoofPort returns noErr and fills it, and
- * MpStats.version (MP_STATS_VERSION) then says which MpStats layout it is, MpStats.tune.version which
- * MpTune layout it applies. Read tune.version before sending anything: send MP_CTL_TUNE only when it
- * equals the MP_TUNE_VERSION you were built with.
+ * with ePointer = a buffer and eBuffSize = sizeof(MpStats) (set it; eDataSize is not used on this
+ * path). The driver answers statusErr, filling nothing, unless eBuffSize >= its own sizeof(MpStats)
+ * (176 bytes for MP_STATS_VERSION 8 on the 68k, natural 2-byte alignment). So the client must supply
+ * a buffer at least as large as the driver's MpStats; a client built against a smaller MpStats gets
+ * statusErr from a newer MoofPort, which looks the same as DaynaPORT (statusErr or another error
+ * and the buffer untouched). Therefore: statusErr alone does not prove the driver is not MoofPort;
+ * give the buffer a generous size (eBuffSize = 256 is fine, the driver only checks the minimum) and
+ * then read MpStats.version (which MpStats layout) and MpStats.tune.version (which MpTune layout the
+ * driver applies). A noErr answer means MoofPort. Send MP_CTL_TUNE only when tune.version equals the
+ * MP_TUNE_VERSION you were built with.
  *
  * Applying a tune: Control csCode MP_CTL_TUNE (0x4D54), ePointer = an MpTune with every field set
  * (the call applies all of them; there is no partial update) and version = MP_TUNE_VERSION. The driver
  * answers controlErr, applying nothing, when the version differs or ePointer is NULL, and noErr
- * otherwise. The values last at most until the next restart (the driver boots with mp_tune_boot).
- * Layout: the MpTune struct above, field order and widths as declared, big-endian, no padding beyond
+ * otherwise. The values last until the next restart. A driver close and reopen does NOT reset
+ * them (mp_drv_open returns early when the driver is already open); only a restart returns the
+ * driver to mp_tune_boot, so a client that wants a particular tune applies it whenever it opens.
+ * Layout: the MpTune struct below, field order and widths as declared, big-endian, no padding beyond
  * the declared pad bytes (68k natural alignment; the struct is 24 bytes). Read the values back from
  * MpStats.tune.
  *
- * Bump rules: MP_TUNE_VERSION changes whenever MpTune's size, field order, field width or a field's
- * meaning changes, and when a flag bit changes meaning. Adding a new flag bit in a previously unused
- * bit, or a new preset, does not change the layout but is a new version too when the driver would
- * treat the old value differently; when in doubt, bump. A driver never accepts a version other than
- * its own, so a client built for another version gets controlErr and must leave the driver alone.
- * MP_STATS_VERSION follows the same rule for MpStats. Fields are only ever appended, never reordered.
+ * Bump rules: MP_TUNE_VERSION changes whenever MpTune's size, field order or a field's width changes,
+ * whenever any field or flag bit changes meaning, and whenever a new flag bit or a new value of an
+ * existing field is defined that an older driver or client could misread (an older driver that
+ * ignores the bit, or applies it as 0, counts as misreading it). Only a change no old reader can
+ * misread (a comment, a new preset built from existing values) leaves it alone. When in doubt, bump.
+ * A driver never accepts a version other than its own, so a client built for another version gets
+ * controlErr and must leave the driver alone. MP_STATS_VERSION follows the same rule for MpStats.
+ * Fields are only ever appended, never reordered.
  *
  * "steadyack" for MoofTCP 1.1 (what MoofTune/MoofBatch call steadyack, see mac/common/mp_levers.h):
  *   version = MP_TUNE_VERSION; burst_ms = mid_ms = idle_ms = 16; hold_ms = 60; quiet_ms = 2000;
