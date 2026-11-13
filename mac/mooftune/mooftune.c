@@ -223,7 +223,7 @@ static int preset(MpTune *t, const unsigned char *outname)
     if (!strcmp(id, "nobatch")) { defaults(t); t->flags |= MP_TUNE_NOBATCH; return 1; }
     if (!strcmp(id, "batch")) { defaults(t); return 1; }
     if (!strcmp(id, "rx2")) { defaults(t); return 1; }
-    if (mp_lever_preset(t, id)) return 1;       /* rx4 chase1 steady steadyrx4 steadyack */
+    if (mp_lever_preset(t, id)) return 1;       /* new old rx4 chase1 steady steadyrx4 steadyack (mp_levers.h) */
     if (!strcmp(id, "inline")) { defaults(t); return 1; }
     if (!strcmp(id, "noinline")) { defaults(t); t->flags |= MP_TUNE_NOINLINE; return 1; }
     if (!strcmp(id, "early1")) { defaults(t); t->early = MP_EARLY_1; return 1; }

@@ -221,6 +221,23 @@ class SettingsTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             plug.batch_cfg("", settings="new")
 
+    def test_batch_cfg_refuses_what_moofbatch_would_drop(self):
+        ten = " ".join("s%d" % i for i in range(10))
+        self.assertEqual(plug.batch_cfg("", host="10.0.0.1", settings=ten), "10.0.0.1 EACRAC\rsettings %s\r" % ten)
+        with self.assertRaises(ValueError):                         # an 11th setting
+            plug.batch_cfg("", host="10.0.0.1", settings=ten + " s10")
+        with self.assertRaises(ValueError):                         # a kept line over 127 characters
+            plug.batch_cfg("", host="10.0.0.1", settings=" ".join(["abcdefghi"] * 9) + "x" * 40)
+        # 9 names of 13 characters: 125 characters is allowed alone, but with rbuf the file passes 159 bytes
+        s125 = " ".join(["abcdefghijklm"] * 8) + " abcdefghijklm"[:12]
+        self.assertLessEqual(len(s125), 127)
+        old = "10.0.0.1 EACRTAC\r"
+        self.assertLessEqual(len(plug.batch_cfg(old, settings=s125)), 159)
+        with self.assertRaises(ValueError):
+            plug.batch_cfg(old, settings=s125, rbuf=16384)
+        with self.assertRaises(ValueError):                         # the old file's settings count too
+            plug.batch_cfg(old + "settings %s s10\r" % ten, modes="R")
+
     def test_batch_cfg_rbuf(self):
         old = "10.0.0.1 EA\rsettings new\r"
         self.assertEqual(plug.batch_cfg(old, rbuf=16384), old + "rbuf 16384\r")

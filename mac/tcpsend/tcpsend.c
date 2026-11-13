@@ -340,7 +340,7 @@ static const uint8_t *ipp_driver(void)
     return 0;
 }
 
-/* copied from mooftcp mac/glue/mt_units.h (mt_units_is_moof); change there first.
+/* copied from mooftcp mac/include/mt_units.h (mt_units_is_moof); change there first.
  * MoofTCP's driver: the open entry is at 0x18 and starts "moveq #0,d0; bra.s" (mt_units_is_moof). */
 static int is_moof(const uint8_t *drv)
 {
@@ -349,8 +349,8 @@ static int is_moof(const uint8_t *drv)
 }
 
 /* The short version string of 'vers' 1 in ":System Folder:MoofTCP" (MoofDiag's release_vers), or "?". The
- * resource fork is closed again only if it was not open already (OpenResFile of an open fork returns the
- * same refnum). */
+ * fork is opened read only; it is closed again only if it was not open already (an open fork returns
+ * the same refnum). */
 static void moof_release(char *out, size_t cap)
 {
     static const unsigned char fname[] = "\pMoofTCP";
@@ -385,7 +385,7 @@ static void moof_release(char *out, size_t cap)
     if (path[0] == 0 || path[0] > 27 + 1) return;
     memcpy(path + 1 + path[0], ":System Folder:MoofTCP", 22);
     path[0] = (unsigned char)(path[0] + 22);
-    res = OpenResFile(path);
+    res = OpenRFPerm(path, 0, fsRdPerm);                     /* read only: the System holds the fork too */
     if (res < 0) return;
     h = Get1Resource('vers', 1);
     if (h && GetHandleSize(h) > 8) {
@@ -970,6 +970,11 @@ static void batch(void)
     skipped[0] = 0;
     strcpy(list, g_mp ? g_settings : "dayna");
     for (p = strtok(list, " "); p && ns < 10; p = strtok(0, " ")) names[ns++] = p;
+    if (p) {                      /* more than 10: the rest never run (the plugin refuses such a cfg) */
+        int more = 0;
+        for (; p; p = strtok(0, " ")) more++;
+        LOG("settings: %d given, only the first 10 run\r", ns + more);
+    }
     total = ns * (int)strlen(g_modes);
     udp_open();
     for (s = 0; s < ns; s++) {
@@ -1021,7 +1026,10 @@ static void read_cfg(void)
         int a, b, c, d, k;
         if (FSOpen((ConstStr255Param)names[i], 0, &r) != noErr) continue;
         GetEOF(r, &len);
-        if (len > 159) len = 159;
+        if (len > 159) {
+            LOG("%.*s: %ld bytes, only the first 159 are read\r", (int)names[i][0], (const char *)names[i] + 1, len);
+            len = 159;
+        }
         FSRead(r, &len, (Ptr)buf);
         FSClose(r);
         buf[len] = 0;
@@ -1035,6 +1043,8 @@ static void read_cfg(void)
             if (!l2) l2 = strchr(buf, '\n');
             if (l2 && i == 0 && !strncmp(l2 + 1, "settings ", 9)) {
                 strncpy(g_settings, l2 + 10, sizeof g_settings - 1);
+                if (strcspn(l2 + 10, "\r\n") > sizeof g_settings - 1)
+                    LOG("settings line is longer than %d characters, cut\r", (int)sizeof g_settings - 1);
                 g_settings[strcspn(g_settings, "\r\n")] = 0;
             }
             if (i == 0) {               /* a line "rbuf <bytes>" after the first */

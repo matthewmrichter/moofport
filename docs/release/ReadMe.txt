@@ -193,7 +193,7 @@ conditions. The PC measured the times. The figures are medians.
     all frames sent
   Wi-Fi frames lost,      16.6 / 1,000  21.6 / 1,000
     full-size frames
-  Resident memory         17,528 bytes  16,554 bytes
+  Resident memory         17,560 bytes  16,554 bytes
 
 The one-at-a-time send figures are both set by occasional Wi-Fi
 loss stalls in that session. When no packet is lost, a single

@@ -9,8 +9,8 @@
  *   steady     DaynaPORT's rhythm: a poll every 16 ms, one frame per READ, no yield cut, chase,
  *              pause or early poll after an inline WRITE
  *   steadyrx4  steady with a budget of 4 received frames per tick
- *   steadyack  the same as new: steady, but one quick poll 2 ms after an inline WRITE (MoofTune ack=2). The tune
- *              ABI has no way to say "steady and that poll": the driver ties the early poll's
+ *   steadyack  the same as new: steady, but one quick poll 2 ms after an inline WRITE (MoofTune
+ *              ack=2). The tune ABI has no way to say "steady and that poll": the driver ties the early poll's
  *              suppression to MP_TUNE2_STEADY, which also means one frame per READ. So
  *              steadyack leaves MP_TUNE2_STEADY off and keeps the rest of steady: up to the
  *              budget of frames per READ, cut by nothing (NOYIELD), and the 16 ms rhythm.
@@ -43,7 +43,7 @@ static void mp_tune_steady(MpTune *t)
     t->flags2 = MP_TUNE2_NOPAUSE | MP_TUNE2_STEADY;
 }
 
-/* Sets every field. Returns 1 if the name is one of the levers above, else 0 (t untouched). */
+/* Sets every tuning field (not version; the caller sets that). Returns 1 if the name is one of the levers above, else 0 (t untouched). */
 static int mp_lever_preset(MpTune *t, const char *name)
 {
     if (!strcmp(name, "new") || !strcmp(name, "steadyack")) { mp_tune_defaults(t); return 1; }

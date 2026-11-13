@@ -90,12 +90,16 @@ def driver_is_moofport(text_lines):
 
 
 RBUF_MIN, RBUF_MAX = 4096, 32768      # MoofBatch's accepted TCPCreate buffer (mac/tcpsend/tcpsend.c)
+# MoofBatch reads at most 159 bytes of the cfg, keeps 127 characters of the settings line and runs
+# 10 settings (tcpsend.c read_cfg, batch); anything past that is lost, so batch_cfg refuses it.
+BATCH_MAX_CFG, BATCH_MAX_SETTINGS_LEN, BATCH_MAX_SETTINGS = 159, 127, 10
 
 
 def batch_cfg(old, host=None, modes=None, settings=None, rbuf=None):
     """MoofBatch.cfg text with line 1 "<host> <modes>" and line 2 "settings <names>" changed as
     given, and an optional line "rbuf <bytes>" (mac/tcpsend/tcpsend.c read_cfg). Missing parts keep the old file's values; MoofBatch's
-    defaults stand in for a missing file. Mac line ends (CR)."""
+    defaults stand in for a missing file. Mac line ends (CR). Raises ValueError for more than 10
+    settings, a settings line over 127 characters or a file over 159 bytes (MoofBatch would drop the rest)."""
     lines = old.replace("\r\n", "\r").replace("\n", "\r").split("\r") if old else []
     first = lines[0].split() if lines and lines[0].strip() else []
     h = host or (first[0] if first else None)
@@ -119,9 +123,16 @@ def batch_cfg(old, host=None, modes=None, settings=None, rbuf=None):
             rb = ln[5:].strip()
     out = "%s %s\r" % (h, m)
     if s:
+        if len(s.split()) > BATCH_MAX_SETTINGS:
+            raise ValueError("%d settings: MoofBatch runs at most %d" % (len(s.split()), BATCH_MAX_SETTINGS))
+        if len(s) > BATCH_MAX_SETTINGS_LEN:
+            raise ValueError("settings line is %d characters: MoofBatch keeps at most %d" % (len(s), BATCH_MAX_SETTINGS_LEN))
         out += "settings %s\r" % s
     if rb is not None:
         out += "rbuf %s\r" % rb
+    if len(out) > BATCH_MAX_CFG:
+        raise ValueError("MoofBatch.cfg would be %d bytes: MoofBatch reads at most %d (shorten the settings)"
+                         % (len(out), BATCH_MAX_CFG))
     return out
 
 

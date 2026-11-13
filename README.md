@@ -237,7 +237,7 @@ in [TESTING_METHODOLOGY.md](TESTING_METHODOLOGY.md).
 | Wi-Fi frames lost, all frames the Mac sent        | 11.3 per 1,000  | 13.9 per 1,000  | same or lower                                                                         |
 | Wi-Fi frames lost, full-size frames               | 16.6 per 1,000  | 21.6 per 1,000  |                                                                                       |
 | AppleShare copy, 336 KB, to / from the server     | 5.0 / 21.6 KB/s | 4.0 / 17.4 KB/s | downloads +24%; uploads +27% but within run-to-run noise (Wi-Fi retries that session) |
-| Resident memory                                   | 17,528 bytes    | 16,554 bytes    | within 1,024 bytes                                                                    |
+| Resident memory                                   | 17,560 bytes    | 16,554 bytes    | within 1,024 bytes                                                                    |
 
 - **When no packet is lost, a single stream of sends runs at about 50 KB/s for both drivers.** The
   difference you see in everyday sending is the Wi-Fi link's occasional lost packet, not the driver.
@@ -245,7 +245,7 @@ in [TESTING_METHODOLOGY.md](TESTING_METHODOLOGY.md).
   alternating in blocks and all 16 copies checked byte for byte. Wi-Fi retries slowed the uploads for
   both drivers in that session. Without the retry pauses, MoofPort copied at 32.6 / 25.5 KB/s and
   DaynaPORT at 28.5 / 20.0 KB/s.
-- **Memory:** MoofPort's 17,560 bytes is what the Mac's `HeapInfoOpen` test reports; DaynaPORT's
+- **Memory:** MoofPort 1.1's 17,560 bytes (1.0 was 17,528) is what the Mac's `HeapInfoOpen` test reports; DaynaPORT's
   16,554 was measured on the hardware.
 
 Receiving and file sharing are faster; sending and latency are level with DaynaPORT.

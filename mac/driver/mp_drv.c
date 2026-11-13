@@ -20,16 +20,20 @@
  *             tick comes at once. A tick stays well under one VBL period, so the
  *             60 Hz tick (Ticks, the System's timers) is not lost (hwsend: 65% lost when ticks
  *             ran 20-37 ms with 13 ms WRITEs inside MacTCP's interrupt-level EWrites).
- *             The interval comes from the core's mp_poll. 1.0 defaults (decision 6): 5 ms for
- *             60 ms after traffic (hw6: receive +9%), one tick until 2 s of quiet, then out to
- *             three ticks (hw6: 36% fewer empty polls on an idle Mac). Every empty READ costs
- *             about 3.3 ms of CPU on the Classic (hw4), which is why the burst is short and the
- *             idle rate low; a 3 ms burst cut TCP send to a third (hw3).
+ *             The interval comes from the core's mp_poll. The 1.1 boot tune (mp_tune_boot in
+ *             mp_drv.h, "steadyack"): a tick every 16 ms whatever the traffic (no idle back-off),
+ *             2 frames per READ, no yield cut or chase, and one quick poll 2 ms after an inline
+ *             WRITE. The 1.0 defaults (decision 6) were 5 ms for 60 ms after traffic (hw6:
+ *             receive +9%), one tick until 2 s of quiet, then out to three ticks (hw6: 36% fewer
+ *             empty polls on an idle Mac); they stay available as MoofTune/MoofBatch "old". Every
+ *             empty READ costs about 3.3 ms of CPU on the Classic (hw4); a 3 ms burst cut TCP
+ *             send to a third (hw3).
  *   EWrite    copies the frame into the TX ring and completes at once; the poll task sends it
  *             about a millisecond later (kick), and polls at burst_ms after it for the reply.
  *             MacTCP calls EWrite at interrupt level, so a WRITE done there (5-13 ms) held off
- *             every other interrupt. MoofTune inline (hwsend7, off by default): with nothing
- *             queued, an interrupt-level EWrite does that one WRITE itself, as DaynaPORT does. When both TX slots are full an async call stays pending
+ *             every other interrupt. Inline WRITE (hwsend7; on in the boot tune, MoofTune noinline
+ *             turns it off): with nothing queued, an interrupt-level EWrite does that one WRITE
+ *             itself, as DaynaPORT does. When both TX slots are full an async call stays pending
  *             (all of MacTCP's EWrites are async, docs/dev/INTERFACE.md section 4): the Device
  *             Manager holds the calls behind it, so order is kept, and the poll task copies the
  *             frame and completes the call with IODone once a slot is free. A sync call made at
@@ -164,7 +168,7 @@ typedef struct MpDrv {
     uint8_t early;                /* MP_EARLY_*: how an inline WRITE's reply is chased (MoofTune chase*) */
     uint8_t cms;                  /* the chase's spacing: ack_ms after a tick's WRITE, 1-2 after inline */
     uint8_t flags2;               /* MpTune.flags2: MP_TUNE2_NOPAUSE, MP_TUNE2_REPOLL */
-    uint8_t tflags;               /* MpTune.flags as last set (0 = the defaults), for Status */
+    uint8_t tflags;               /* MpTune.flags as last set (the boot tune: NOYIELD|NOCHASE|ACK2 = 0x1C), for Status */
     uint32_t kicks, v_ok, v_bad, v_big;
     struct EPB *parked;           /* an EWrite waiting for a free TX slot */
     void *dce;                    /* ... its DCE, for IODone */
