@@ -53,6 +53,21 @@ typedef struct MpTune {
                                         ack_ms (the default since hwsend11: the ACK is back 3-5 ms
                                         after the WRITE, so earlier READs come back empty) */
 
+/* The tune the driver starts with (MoofPort 1.1; "steadyack" in MoofBatch/MoofTune, which is also what
+ * their "new" and "default" mean): a poll every 16 ms whatever the traffic (burst = mid = idle), up to 2
+ * frames per READ, no yield cut, chase or reply pause, one quick poll 2 ms after an inline WRITE.
+ * The 1.0 defaults (5 ms bursts, 17/51 ms ticks, 5 ms after a WRITE) are the tools' "old". The driver
+ * applies this at open; the tools start from it, so Status shows exactly it until a tool changes it. */
+static inline void mp_tune_boot(MpTune *t)
+{
+    t->burst_ms = t->mid_ms = t->idle_ms = 16; t->hold_ms = 60; t->quiet_ms = 2000;
+    t->step_ms = 0; t->busy_ms = 2;
+    t->blind = 1; t->verify = 0; t->blind_tx = 1;
+    t->flags = MP_TUNE_NOYIELD | MP_TUNE_NOCHASE | MP_TUNE_ACK2;
+    t->early = MP_EARLY_OFF; t->pad = 0;
+    t->flags2 = MP_TUNE2_NOPAUSE; t->pad2 = 0;
+}
+
 typedef struct MpStats {
     uint16_t version;
     int16_t  scsi_id;

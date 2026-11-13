@@ -36,8 +36,10 @@
  * MoofBatch (the same source built with MP_BATCH, hwsend11): one run id, then every MoofTune
  * setting in "MoofBatch.cfg"'s second line ("settings new oldhush early0 noinline", the
  * default) in turn, set through the driver's MP_CTL_TUNE with no restart, and the modes for each
- * (default EACRAC; "keep" applies nothing and uses what the driver has; the levers rx4, chase1,
- * steady, steadyrx4, steadyack are mac/common/mp_levers.h, shared with MoofTune).
+ * (default EACRAC; "keep" applies nothing and uses what the driver has; the levers new
+ * (MoofPort 1.1's boot defaults = steadyack), old (1.0's defaults), rx4, chase1, steady, steadyrx4,
+ * steadyack are mac/common/mp_levers.h, shared with MoofTune; oldhush, early0, noinline, old10,
+ * nopause, repoll change the 1.0 defaults).
  * With DaynaPORT (no MoofPort counters) it runs the modes once as "dayna".
  * Before and after each test it sends "MARK <run> <setting> <n> <test> start|end" by UDP to the
  * PC's port 17040 (testnet.py logs it; scripts/hwsend-batch.py splits the capture by it). A
@@ -888,11 +890,10 @@ static int apply_setting(const char *setting)
     if (!enet_status(MP_STATUS_STATS, &g_s0, (int16_t)sizeof g_s0)) return -1;
     t = g_s0.tune;
     t.version = MP_TUNE_VERSION;
-    mp_tune_defaults(&t);
+    mp_tune_old(&t);        /* the older settings below change the 1.0 defaults */
     if (mp_lever_preset(&t, name)) {
-        /* rx4, chase1, steady, steadyrx4, steadyack: mp_levers.h, the same as MoofTune's presets */
-    } else if (!strcmp(name, "new")) {
-        /* the hwsend11 defaults: inline, first poll 5 ms after it, reply pause, no re-poll */
+        /* new (the 1.1 defaults), old (1.0's), rx4, chase1, steady, steadyrx4, steadyack:
+         * mp_levers.h, the same as MoofTune's presets */
     } else if (!strcmp(name, "oldhush")) {
         t.flags = MP_TUNE_HUSH; t.flags2 = MP_TUNE2_NOPAUSE | MP_TUNE2_REPOLL;
     } else if (!strcmp(name, "early0")) {
