@@ -52,6 +52,7 @@ you can read, tests, and somebody to fix it.
 - Uses newer BlueSCSI firmware's several-packets-per-command READ and WRITE when it is there, and
   works with older firmware one packet at a time.
 - MoofStat shows the driver's counters; MoofTune changes its timing until the next restart.
+  MoofPort 1.1 starts with 1.0's timing; MoofTCP 1.1 switches it to its `steadyack` setting itself when it opens the driver.
 - Open source (MIT), with host unit tests and emulator tests.
 
 ## Requirements

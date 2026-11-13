@@ -557,12 +557,14 @@ MoofTCP on top of MoofPort is where the larger bulk gains will show.
    The core's `mp_poll` gained the middle level (`mid_ms`, `quiet_ms`). Phase 6 (release prep)
    starts: user README, compatibility matrix (`docs/dev/COMPAT.md`), `scripts/release.sh`, and
    the release-candidate session hw7.
-7. **1.1 default = steadyack (2026-11-13, hardware-paired against 1.0).** Approved by Matt. The
-   driver boots with `mp_tune_boot` (`mac/driver/mp_drv.h`): a poll every 16 ms whatever the
-   traffic, up to 2 frames per READ, no yield cut, chase or reply pause, one quick poll 2 ms after
-   an inline WRITE (echo -6.2 ms, terminal -13.9 ms, receive +2.6k B/s, send about level). Decision
-   6's values are the MoofTune/MoofBatch preset `old`; `new`, `default` and `steadyack` are the new
-   boot tune. Resident memory 17,560 bytes (Snow, installer path, HeapInfoOpen), 18 under the cap.
+7. **1.1 boots with 1.0's settings; MoofTCP applies steadyack (2026-11-13).** 1.1d1 made steadyack the
+   boot default (hardware-paired: echo -6.2 ms, terminal -13.9 ms, receive +2.6k B/s under the DaynaPORT
+   test setup). Hardware session mport5 under MacTCP found it worse there (receive -18%, echo +1.8 ms,
+   terminal +2.1 ms), so Matt reverted: 1.1d2 boots with decision 6's values again (`mp_tune_boot` in
+   `mac/driver/mp_drv.h`; MoofTune/MoofBatch `new` = `old` = `default`). `steadyack` stays a preset.
+   MoofTCP 1.1 switches MoofPort to steadyack itself with MP_CTL_TUNE when it opens .ENET0; the ABI it
+   relies on (version word, layout, how to detect MoofPort) is documented in `mp_drv.h` as a stable
+   contract. Resident memory 17,560 bytes (Snow, installer path, HeapInfoOpen), 18 under the cap.
 
 ---
 
