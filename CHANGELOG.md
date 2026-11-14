@@ -24,19 +24,24 @@ MoofPort 1.1 works with MoofTCP 1.1 to make TCP faster. Under MacTCP it behaves 
 
 - On a real Mac Classic (System 6.0.8, 4 MB, BlueSCSI v2 Wi-Fi), timed on the PC: MoofTCP 1.1 with MoofPort 1.1
   against 1.0's behaviour (the MoofTCP 1.0 engine, with MoofPort at 1.0's settings). The gains come from both
-  together: MoofTCP 1.1's shorter call path and MoofPort's `steadyack` timing. Medians: echo TBD-conf3b, terminal
-  burst (2,000 bytes) TBD-conf3b, TCP receive TBD-conf3b, queued send TBD-conf3b. TBD-conf3b: one-at-a-time sends
-  and AppleShare copies. Measured over Wi-Fi; the figures vary with the network.
+  together: MoofTCP 1.1's shorter call path and MoofPort's `steadyack` timing. 2026-11-14, 10 pairs in one
+  session, the AppleShare server's Wi-Fi power saving off. Medians, each better in all 10 pairs: echo 53.6 -> 41.4 ms,
+  terminal burst (2,000 bytes) 153.6 -> 124.6 ms, TCP receive 45.3 -> 55.6 KB/s. Not significant that day: queued
+  send (36.7 -> 41.0 KB/s), one-at-a-time sends (25.2 -> 23.9 KB/s) and AppleShare copies (too few pairs); the
+  network was noisy. The session the night before gave the same direction. Measured over Wi-Fi; the figures vary
+  with the network.
 - MoofTCP 1.1's MoofDiag showed `steadyack` applied in every MoofPort block.
 - Host unit tests with AddressSanitizer and UBSan; Snow runs of MoofBatch under MacTCP and under MoofTCP 1.1.
 
 ### Known limitations
 
-- AppleShare volumes set to open at start-up can fail to mount when the AppleShare server is itself on Wi-Fi with
-  Wi-Fi power saving on: in tests, between about 1 in 7 and 1 in 3 boots. It is not a MoofPort defect: the stock
-  DaynaPORT driver does the same, and it happened in 0 of 15 boots with power saving off. AppleTalk's start-up
-  lookups are multicast, and a power-saving Wi-Fi receiver misses most of them. Turn power saving off on the
-  server, use a wired server, or open the volume from the Chooser.
+- AppleShare volumes set to open at start-up can fail to mount. At start-up AppleShare finds the server with
+  AppleTalk multicast lookups (4 tries in about 2 seconds, no retry), and on Wi-Fi these are lost far more often
+  than normal traffic. Measured on the test setup: with the server's Wi-Fi power saving on, about 1 in 7 to 1 in 3
+  boots failed; with it off, 0 of 15 at night but up to 1 in 3 at busy times of day. The stock MacTCP + DaynaPORT
+  driver fails the same way, and in an interleaved test MacTCP + MoofPort failed 4 of 10 boots and MoofTCP 1.1 +
+  MoofPort 1 of 10. It is not caused by MoofPort or MoofTCP. Workaround: open the volume from the Chooser; to make
+  it rarer, reduce multicast loss (a wired connection for the server, the server's Wi-Fi power saving off).
 - The 17,560-byte resident figure is from the emulator; it is not yet confirmed on hardware.
 - The limitations of 1.0 below still apply.
 

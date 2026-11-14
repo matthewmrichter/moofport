@@ -66,15 +66,17 @@ opens the driver. Measured on a real Mac Classic (System 6.0.8, 4 MB, BlueSCSI v
 1.1 with MoofPort 1.1 against 1.0's behaviour (the MoofTCP 1.0 engine, with MoofPort at 1.0's settings). The gains
 come from both together: MoofTCP 1.1's shorter call path and MoofPort's `steadyack` timing. Medians:
 
-|                             | 1.0        | 1.1        |
-| --------------------------- | ---------- | ---------- |
-| Echo round trip, 1 byte     | TBD-conf3b | TBD-conf3b |
-| Terminal burst, 2,000 bytes | TBD-conf3b | TBD-conf3b |
-| TCP receive, 1 MB           | TBD-conf3b | TBD-conf3b |
-| TCP send, 4 sends queued    | TBD-conf3b | TBD-conf3b |
+|                             | 1.0       | 1.1       |
+| --------------------------- | --------- | --------- |
+| Echo round trip, 1 byte     | 53.6 ms   | 41.4 ms   |
+| Terminal burst, 2,000 bytes | 153.6 ms  | 124.6 ms  |
+| TCP receive, 1 MB           | 45.3 KB/s | 55.6 KB/s |
 
-TBD-conf3b: one-at-a-time sends and AppleShare copies. The figures were measured over Wi-Fi and vary with the
-network.
+Measured 2026-11-14 in one session of 10 pairs, with the AppleShare server's Wi-Fi power saving off. These three
+were better in all 10 pairs (the session the night before gave the same direction). Not significant in this
+session: TCP send with 4 sends queued (36.7 -> 41.0 KB/s), one-at-a-time sends (25.2 -> 23.9 KB/s) and AppleShare
+copies (too few pairs with the volume mounted). The network was noisy that day: stock MacTCP's one-at-a-time send
+ranged from 11 to 40 KB/s. The figures were measured over Wi-Fi and vary with the network.
 
 To go back to 1.0: run the 1.0 MoofPortInstall, click **Update** (it installs its own driver whatever version is
 installed), and restart.
@@ -288,11 +290,13 @@ Receiving and file sharing are faster; sending and latency are level with DaynaP
   same hardware.
 - **If you hold Shift at start-up, MoofPort stays active.** MoofPort is in the System file, not
   in an extension.
-- **AppleShare volumes set to open at start-up may not mount** when the AppleShare server is itself on Wi-Fi
-  with Wi-Fi power saving on: in tests, between about 1 boot in 7 and 1 in 3. It is not a MoofPort defect: the
-  stock DaynaPORT driver does the same, and it happened in none of 15 boots with power saving off. AppleTalk's
-  start-up lookups are multicast, and a power-saving Wi-Fi receiver misses most of them. Turn power saving off on
-  the server, use a wired server, or open the volume from the Chooser.
+- **AppleShare volumes set to open at start-up may not mount.** At start-up AppleShare finds the server with
+  AppleTalk multicast lookups (4 tries in about 2 seconds, no retry), and on Wi-Fi these are lost far more often
+  than normal traffic. Measured on the test setup: with the server's Wi-Fi power saving on, about 1 in 7 to 1 in 3
+  boots failed; with it off, 0 of 15 at night but up to 1 in 3 at busy times of day. The stock MacTCP + DaynaPORT
+  driver fails the same way, and in an interleaved test MacTCP + MoofPort failed 4 of 10 boots and MoofTCP 1.1 +
+  MoofPort 1 of 10. It is not caused by MoofPort or MoofTCP. Workaround: open the volume from the Chooser; to make
+  it rarer, reduce multicast loss (a wired connection for the server, the server's Wi-Fi power saving off).
 
 ## Testing methodology
 
