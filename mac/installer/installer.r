@@ -51,9 +51,9 @@ resource 'ALRT' (130) {
 };
 
 resource 'vers' (1) {
-    0x01, 0x10, development, 0x01, verUS,
-    "1.1d2",
-    "MoofPort 1.1d2 installer"
+    0x01, 0x10, beta, 0x01, verUS,
+    "1.1rc1",
+    "MoofPort 1.1rc1 installer"
 };
 
 /* the icon family (mac/icons, scripts/icons.py) */

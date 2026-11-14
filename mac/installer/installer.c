@@ -55,9 +55,9 @@ QDGlobals qd;
  * "send-fix": branch send-fix's driver (queued EWrites, bounded poll ticks, blind frame writes);
  * the release thread sets the real version when it takes the change. */
 #ifdef MP_DIAG
-#define MP_INST_VER "1.1d2 diagnostic"
+#define MP_INST_VER "1.1rc1 diagnostic"
 #else
-#define MP_INST_VER "1.1d2"
+#define MP_INST_VER "1.1rc1"
 #endif
 #define T_DRVR     'DRVR'
 #define T_PARKED   'DRVx'           /* DaynaPORT's driver while MoofPort is installed */
