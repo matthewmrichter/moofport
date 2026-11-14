@@ -131,6 +131,31 @@ int main(void)
                 dg.ew_kind[1], dg.ew_kind[2], dg.ew_kind[3], dg.ew_kind[4], dg.ew_kind[5],
                 dg.ew_sync_park, dg.ew_refused);
     }
+    {
+        /* the hwsend diagnostic driver only: the frame log (every frame of every WRITE since its last
+         * reset, or since the open: the AppleShare mount-at-boot hunt). DDP: seq = dst net/node/socket,
+         * id = src socket << 8 | DDP type; others: etype = the 802.3 length, len = the frame length. */
+        static MpWLog wl;
+        uint32_t n, i;
+        uint16_t at;
+        memset(&wl, 0, sizeof wl);
+        memset(&pb, 0, sizeof pb);
+        pb.ioRefNum = ref;
+        pb.csCode = MP_STATUS_WLOG;
+        pb.ePointer = (uint32_t)&wl;
+        pb.eBuffSize = (int16_t)sizeof wl;
+        if (PBStatusSync((ParmBlkPtr)&pb) == noErr && wl.version == MP_DIAG_VERSION) {
+            n = wl.total < MP_WLOG_N ? wl.total : MP_WLOG_N;
+            at = (uint16_t)(wl.total < MP_WLOG_N ? 0 : wl.pos);
+            LOG("frame log: %lu frames written, the last %lu (W time type id seq len port rc i/n)\r",
+                (unsigned long)wl.total, (unsigned long)n);
+            for (i = 0; i < n; i++) {
+                const MpWEntry *e = &wl.e[(at + i) & (MP_WLOG_N - 1)];
+                LOG("W %u %04x %04x %08lx %u %u %d %u/%u\r", e->t, e->etype, e->id,
+                    (unsigned long)e->seq, e->len, e->port, (int)e->rc, e->pos & 7, (e->pos >> 3) & 15);
+            }
+        }
+    }
 fin:
     if (g_outref >= 0) { FSClose(g_outref); g_outref = -1; }
     FlushVol(0, 0);
