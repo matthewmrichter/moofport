@@ -21,25 +21,33 @@ This folder contains these files:
 
 NEW IN 1.1
 
+This is a release candidate (1.1rc1).
+
 MoofPort 1.1 starts with the same timing settings as 1.0, so
 under MacTCP it works as 1.0 did.
 
 MoofTCP 1.1 switches MoofPort to its "steadyack" setting when
 it opens the driver. Measured on a real Mac Classic over the
-BlueSCSI v2 Wi-Fi (10 pairs, one session, medians, timed on the
-PC), MoofTCP 1.1 with MoofPort 1.1 against MoofTCP 1.0 with
-MoofPort 1.0:
+BlueSCSI v2 Wi-Fi (medians, timed on the PC): MoofTCP 1.1 with
+MoofPort 1.1, against 1.0's behaviour (the MoofTCP 1.0 engine,
+with MoofPort at 1.0's settings). The gains come from both
+together: MoofTCP 1.1's shorter path and MoofPort's
+"steadyack" timing.
 
                           1.0           1.1
-  Echo round trip         53.6 ms       about 44.5 ms
-  Terminal burst,         153.6 ms      about 131 ms
+  Echo round trip         TBD-conf3b    TBD-conf3b
+  Terminal burst,         TBD-conf3b    TBD-conf3b
     2,000 bytes
-  TCP receive, 1 MB       45.1 KB/s     about 54.8 KB/s
-  TCP send, 4 sends       38.0 KB/s     about 41.0 KB/s
+  TCP receive, 1 MB       TBD-conf3b    TBD-conf3b
+  TCP send, 4 sends       TBD-conf3b    TBD-conf3b
     queued
 
-One-at-a-time sends and AppleShare copies showed no clear
-difference. The figures vary with the network.
+TBD-conf3b: one-at-a-time sends and AppleShare copies. The
+figures vary with the network.
+
+To go back to 1.0: open the 1.0 MoofPortInstall, click Update
+(it installs its own driver whatever version is installed),
+and restart.
 
 MoofPort 1.1 uses 17,560 bytes of system memory (measured in
 the emulator; 1.0 used 17,528).
@@ -248,12 +256,14 @@ KNOWN ISSUES
     MoofPort is in the System file, not in an extension.
   - AppleShare volumes set to open at start-up may not mount
     when the AppleShare server is itself on Wi-Fi with Wi-Fi
-    power saving on. AppleTalk looks for the server with
+    power saving on: in tests, between about 1 boot in 7 and
+    1 in 3. It is not a MoofPort defect: the DaynaPORT driver
+    does the same, and it happened in none of 15 boots with
+    power saving off. AppleTalk looks for the server with
     multicast packets at start-up, and a power-saving Wi-Fi
-    receiver misses most of them (about 1 boot in 7 in tests;
-    none with power saving off). The DaynaPORT driver does the
-    same. Turn power saving off on the server, wire the
-    server, or open the volume from the Chooser.
+    receiver misses most of them. Turn power saving off on the
+    server, wire the server, or open the volume from the
+    Chooser.
 
 
 TROUBLESHOOTING

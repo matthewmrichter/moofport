@@ -22,22 +22,27 @@ MoofPort 1.1 works with MoofTCP 1.1 to make TCP faster. Under MacTCP it behaves 
 
 ### Tested
 
-- On a real Mac Classic (System 6.0.8, 4 MB, BlueSCSI v2 Wi-Fi), 2026-11-13, timed on the PC: MoofTCP 1.1 with
-  MoofPort 1.1 against MoofTCP 1.0 with MoofPort 1.0, 10 paired blocks in one session. Medians: echo 53.6 ms ->
-  about 44.5 ms, terminal burst (2,000 bytes) 153.6 -> about 131 ms, TCP receive 45.1 -> about 54.8 KB/s, queued
-  send 38.0 -> about 41.0 KB/s, each better in all 10 pairs. One-at-a-time sends and AppleShare copies showed no
-  significant difference. Measured over Wi-Fi; the figures vary with the network.
-- MoofTCP 1.1's MoofDiag showed `steadyack` applied in all 10 blocks.
+- On a real Mac Classic (System 6.0.8, 4 MB, BlueSCSI v2 Wi-Fi), timed on the PC: MoofTCP 1.1 with MoofPort 1.1
+  against 1.0's behaviour (the MoofTCP 1.0 engine, with MoofPort at 1.0's settings). The gains come from both
+  together: MoofTCP 1.1's shorter call path and MoofPort's `steadyack` timing. Medians: echo TBD-conf3b, terminal
+  burst (2,000 bytes) TBD-conf3b, TCP receive TBD-conf3b, queued send TBD-conf3b. TBD-conf3b: one-at-a-time sends
+  and AppleShare copies. Measured over Wi-Fi; the figures vary with the network.
+- MoofTCP 1.1's MoofDiag showed `steadyack` applied in every MoofPort block.
 - Host unit tests with AddressSanitizer and UBSan; Snow runs of MoofBatch under MacTCP and under MoofTCP 1.1.
 
 ### Known limitations
 
 - AppleShare volumes set to open at start-up can fail to mount when the AppleShare server is itself on Wi-Fi with
-  Wi-Fi power saving on. AppleTalk's start-up lookups are multicast, and a power-saving Wi-Fi receiver misses most
-  of them (about 1 in 7 boots with power saving on, 0 in 15 with it off). The stock DaynaPORT driver does the
-  same. Turn power saving off on the server, use a wired server, or open the volume from the Chooser.
+  Wi-Fi power saving on: in tests, between about 1 in 7 and 1 in 3 boots. It is not a MoofPort defect: the stock
+  DaynaPORT driver does the same, and it happened in 0 of 15 boots with power saving off. AppleTalk's start-up
+  lookups are multicast, and a power-saving Wi-Fi receiver misses most of them. Turn power saving off on the
+  server, use a wired server, or open the volume from the Chooser.
 - The 17,560-byte resident figure is from the emulator; it is not yet confirmed on hardware.
 - The limitations of 1.0 below still apply.
+
+### Going back to 1.0
+
+Run the 1.0 MoofPortInstall, click Update (it installs its own driver whatever version is installed), and restart.
 
 ## 1.0 (first release, 2026-11-10)
 

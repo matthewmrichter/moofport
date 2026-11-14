@@ -57,21 +57,27 @@ you can read, tests, and somebody to fix it.
 
 ## New in 1.1 (release candidate 1.1rc1)
 
+1.1rc1 is a release candidate. The download on the Releases page is still 1.0, and the file names below stay 1.0
+until 1.1 is final.
+
 MoofPort 1.1 starts with 1.0's timing settings, so under MacTCP it works as 1.0 did.
 [MoofTCP](https://github.com/matthewmrichter/mooftcp/) 1.1 switches MoofPort to its `steadyack` setting when it
-opens the driver. Measured on a real Mac Classic (System 6.0.8, 4 MB, BlueSCSI v2 Wi-Fi) on 2026-11-13: MoofTCP
-1.1 with MoofPort 1.1 against MoofTCP 1.0 with MoofPort 1.0, 10 paired blocks in one session, timed on the PC.
-Medians:
+opens the driver. Measured on a real Mac Classic (System 6.0.8, 4 MB, BlueSCSI v2 Wi-Fi), timed on the PC: MoofTCP
+1.1 with MoofPort 1.1 against 1.0's behaviour (the MoofTCP 1.0 engine, with MoofPort at 1.0's settings). The gains
+come from both together: MoofTCP 1.1's shorter call path and MoofPort's `steadyack` timing. Medians:
 
-|                             | 1.0       | 1.1             |
-| --------------------------- | --------- | --------------- |
-| Echo round trip, 1 byte     | 53.6 ms   | about 44.5 ms   |
-| Terminal burst, 2,000 bytes | 153.6 ms  | about 131 ms    |
-| TCP receive, 1 MB           | 45.1 KB/s | about 54.8 KB/s |
-| TCP send, 4 sends queued    | 38.0 KB/s | about 41.0 KB/s |
+|                             | 1.0        | 1.1        |
+| --------------------------- | ---------- | ---------- |
+| Echo round trip, 1 byte     | TBD-conf3b | TBD-conf3b |
+| Terminal burst, 2,000 bytes | TBD-conf3b | TBD-conf3b |
+| TCP receive, 1 MB           | TBD-conf3b | TBD-conf3b |
+| TCP send, 4 sends queued    | TBD-conf3b | TBD-conf3b |
 
-All four were better in every pair. One-at-a-time sends and AppleShare copies showed no significant difference.
-The figures were measured over Wi-Fi and vary with the network.
+TBD-conf3b: one-at-a-time sends and AppleShare copies. The figures were measured over Wi-Fi and vary with the
+network.
+
+To go back to 1.0: run the 1.0 MoofPortInstall, click **Update** (it installs its own driver whatever version is
+installed), and restart.
 
 Also new: a stable private interface for that switch (`mac/driver/mp_drv.h`), an unattended mode of
 MoofPortInstall for test harnesses, and new MoofBatch settings. [CHANGELOG.md](CHANGELOG.md) has the full list.
@@ -283,9 +289,10 @@ Receiving and file sharing are faster; sending and latency are level with DaynaP
 - **If you hold Shift at start-up, MoofPort stays active.** MoofPort is in the System file, not
   in an extension.
 - **AppleShare volumes set to open at start-up may not mount** when the AppleShare server is itself on Wi-Fi
-  with Wi-Fi power saving on. AppleTalk's start-up lookups are multicast, and a power-saving Wi-Fi receiver misses
-  most of them (about 1 boot in 7 with power saving on, none in 15 with it off). The stock DaynaPORT driver does
-  the same. Turn power saving off on the server, use a wired server, or open the volume from the Chooser.
+  with Wi-Fi power saving on: in tests, between about 1 boot in 7 and 1 in 3. It is not a MoofPort defect: the
+  stock DaynaPORT driver does the same, and it happened in none of 15 boots with power saving off. AppleTalk's
+  start-up lookups are multicast, and a power-saving Wi-Fi receiver misses most of them. Turn power saving off on
+  the server, use a wired server, or open the volume from the Chooser.
 
 ## Testing methodology
 
