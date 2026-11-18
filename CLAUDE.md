@@ -77,6 +77,8 @@ The Snow emulator tests need your own ROM and Apple software (never in git):
   EWrite hangs, interrupt mask 6) do the sane thing as long as MacTCP cannot tell.
 - The driver is position-independent and not relocated: no libgcc helper calls (`__divsi3`, `__mulsi3`, ...; they link at an
   absolute address and crashed it once). `release.sh` checks with `nm`; avoid 32-bit division and multiplication by variables.
+- `README.md`, `INSTALL.md`: one line per paragraph and per list item (no hard wrapping). `docs/release/ReadMe.txt` is the opposite:
+  at most 64 columns, CR line endings (TeachText; `release.sh` checks it).
 - Mac Ticks are unreliable for timing under load. Time on the PC (host capture, `testnet.py` logs), not with Ticks.
 - Resident memory: at most DaynaPORT's 16,554 bytes + 1,024 = **17,578** (PLAN 2.4, decision 4). `test_budget` enforces it for
   the default settings; release builds must fit. Trim only where performance does not suffer; never fewer ring slots to save memory.

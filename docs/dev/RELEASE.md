@@ -53,7 +53,7 @@ DaynaPORT driver is already on the Mac.
   transfer, mail or web form keeps it intact), it carries the `.sit`'s type and creator, and StuffIt
   Expander and StuffIt Lite decode and expand it in one step. The hardware test kits ship this
   way (`scripts/hw-bundle.py`), expanded with StuffIt Lite 3.6 on the Classic. The
-  name ends in `.sit.hqx` so it says what is inside; README's Download table matches.
+  name ends in `.sit.hqx` so it says what is inside; INSTALL.md's Download table matches.
 - **Checksum file.** MoofTCP's `release.sh` writes none; its GitHub release has a hand-made
   `SHA256SUMS`. MoofPort's `release.sh` writes `MoofPort-<v>.sha256` (same `sha256sum` format) and
   `release-verify.sh` checks it, so the checksums that get published are the verified ones. Upload
@@ -182,7 +182,7 @@ data byte for byte (only Finder-written resource-header bytes and kHasBeenInited
 ## Publishing (not scripted)
 
 Pushing, tagging (`v<v>`, see Versioning) and the GitHub release are manual steps. Upload `MoofPort-<v>.dsk`, `.sit`, `.sit.hqx` and
-`.sha256` as release assets, with notes in the style of MoofTCP's `dist/release-1.0/RELEASE_NOTES.md`
+`.sha256` as release assets, with the notes in `docs/release/NOTES-<v>.md` (tracked; written in the style of MoofTCP's `dist/release-1.0/RELEASE_NOTES.md`)
 (Download table, highlights, tested, known limitations). CI (if added, like MoofTCP's host-test
 workflow) runs on push and is not part of the release build.
 
