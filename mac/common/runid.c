@@ -4,7 +4,8 @@
  * one's file. On launch each tool now asks for a run id (DLOG 200, runid.r) and writes
  * "<Tool>-<id>.out". The id is remembered in the text file "MoofPort Run" in the same folder and
  * offered next time. If that file's first line starts with '!', the rest of the line is used as
- * the id without asking: that keeps unattended runs (Snow) unattended. Cancel or an empty id
+ * the id without asking: that keeps unattended runs (Snow) unattended. "!!" also tells the tool
+ * to skip its closing alert and quit (runid_unattended), so MoofAgent (mac/moofagent) sees it end. Cancel or an empty id
  * gives the old "<Tool>.out". ':' (the HFS path separator) and control characters become '-',
  * and the id is cut so the whole name fits HFS's 31 characters.
  */
@@ -15,6 +16,10 @@
 
 #define RUN_FILE "\pMoofPort Run"
 enum { kDlog = 200, kOK = 1, kCancel = 2, kEdit = 4 };
+
+static int g_unattended;
+
+int runid_unattended(void) { return g_unattended; }
 
 static void read_last(unsigned char *id, int *quiet)
 {
@@ -29,6 +34,7 @@ static void read_last(unsigned char *id, int *quiet)
     FSClose(r);
     i = 0;
     if (len > 0 && buf[0] == '!') { *quiet = 1; i = 1; }
+    if (len > 1 && buf[0] == '!' && buf[1] == '!') { g_unattended = 1; i = 2; }
     for (; i < len && buf[i] != '\r' && buf[i] != '\n'; i++) id[++n] = (unsigned char)buf[i];
     id[0] = (unsigned char)n;
 }

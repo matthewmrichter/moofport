@@ -6,7 +6,8 @@
  * burst, hold, mid, quiet, idle, step, busy (ms), blind, blind_tx, verify, batch, chase, yield,
  * inline (0/1), early (ms after an inline WRITE: 1, 2, 0 = the usual poll), rx (frames per tick, 2 or 4), ack (ms after a WRITE, 2 or 5), hush (0/1: 15 ms); unnamed keys
  * keep their current value), else from the run id, which then names a preset:
- *     default   MoofPort's defaults (decision 6): 5 ms for 60 ms after traffic, one tick
+ *     default   the boot defaults, the same as new and old: MoofPort 1.0's values (see mp_levers.h); steadyack is what MoofTCP 1.1 applies:
+ *               the 'defaults' in the older presets below are 1.0's (decision 6): 5 ms for 60 ms after traffic, one tick
  *               until 2 s of quiet, then out to three ticks; blind reads, blind frame writes
  *               (send-fix; 1.0b1 wrote polled), batched WRITEs, 2 frames per tick, poll 5 ms after a
  *               WRITE and chase the reply, yield after a READ of replies only; inline writes with
@@ -20,6 +21,7 @@
  *     nobatch   the defaults, but one frame per WRITE
  *     batch     the defaults (all queued frames in one WRITE, new firmware)
  *     rx2       the defaults (at most 2 received frames per poll tick, since hwsend7)
+ *     steadyrx4, steadyack: see mp_levers.h (shared with MoofBatch)
  *     rx4       the defaults, but up to 4 received frames per poll tick (hwsend6's default)
  *     inline    the defaults (since hwsend9: an EWrite with nothing queued is written at once, in
  *               the call, and the first READ follows 2 ms later)
@@ -64,6 +66,7 @@
 #include <string.h>
 #include "runid.h"
 #include "mp_drv.h"
+#include "mp_levers.h"
 
 QDGlobals qd;
 
@@ -188,13 +191,8 @@ static int read_cfg(MpTune *t)
     return 1;
 }
 
-static void defaults(MpTune *t)
-{
-    t->burst_ms = 5; t->hold_ms = 60; t->mid_ms = 17; t->quiet_ms = 2000; t->idle_ms = 51;
-    t->step_ms = 17; t->busy_ms = 2;
-    t->blind = 1; t->verify = 0; t->blind_tx = 1; t->flags = 0; t->early = MP_EARLY_OFF; t->pad = 0;
-    t->flags2 = 0; t->pad2 = 0;
-}
+/* The older presets below ('the defaults but ...') change MoofPort 1.0's defaults, as when they were measured. */
+static void defaults(MpTune *t) { mp_tune_old(t); }
 
 /* One poll per tick, always (0.3d3's timing). */
 static void tick(MpTune *t)
@@ -211,7 +209,7 @@ static int preset(MpTune *t, const unsigned char *outname)
     if (n <= 0 || n >= (int)sizeof id) return 0;
     memcpy(id, outname + 1 + 9, (size_t)n);
     id[n] = 0;
-    if (!strcmp(id, "default")) { defaults(t); return 1; }
+    if (!strcmp(id, "default")) { mp_tune_defaults(t); return 1; }   /* = new = old = the boot tune (1.0's values) */
     if (!strcmp(id, "tick")) { defaults(t); tick(t); return 1; }
     if (!strcmp(id, "phase1")) { defaults(t); tick(t); t->blind = 0; return 1; }
     if (!strcmp(id, "burst")) { defaults(t); tick(t); t->burst_ms = 5; t->hold_ms = 60; return 1; }
@@ -225,10 +223,10 @@ static int preset(MpTune *t, const unsigned char *outname)
     if (!strcmp(id, "nobatch")) { defaults(t); t->flags |= MP_TUNE_NOBATCH; return 1; }
     if (!strcmp(id, "batch")) { defaults(t); return 1; }
     if (!strcmp(id, "rx2")) { defaults(t); return 1; }
-    if (!strcmp(id, "rx4")) { defaults(t); t->flags |= MP_TUNE_RX4; return 1; }
+    if (mp_lever_preset(t, id)) return 1;       /* new old rx4 chase1 steady steadyrx4 steadyack (mp_levers.h) */
     if (!strcmp(id, "inline")) { defaults(t); return 1; }
     if (!strcmp(id, "noinline")) { defaults(t); t->flags |= MP_TUNE_NOINLINE; return 1; }
-    if (!strcmp(id, "chase1") || !strcmp(id, "early1")) { defaults(t); t->early = MP_EARLY_1; return 1; }
+    if (!strcmp(id, "early1")) { defaults(t); t->early = MP_EARLY_1; return 1; }
     if (!strcmp(id, "chase2") || !strcmp(id, "early2")) { defaults(t); t->early = MP_EARLY_2; return 1; }
     if (!strcmp(id, "inhushc1")) { defaults(t); t->flags |= MP_TUNE_HUSH; t->early = MP_EARLY_1; return 1; }
     if (!strcmp(id, "inhush0")) { defaults(t); t->flags |= MP_TUNE_HUSH; t->early = MP_EARLY_OFF; return 1; }
@@ -237,15 +235,9 @@ static int preset(MpTune *t, const unsigned char *outname)
     if (!strcmp(id, "hush")) { defaults(t); t->flags |= MP_TUNE_NOINLINE | MP_TUNE_HUSH; return 1; }
     if (!strcmp(id, "inhush")) { defaults(t); t->flags |= MP_TUNE_HUSH; t->early = MP_EARLY_2; return 1; }
     if (!strcmp(id, "nopause")) { defaults(t); t->flags2 = MP_TUNE2_NOPAUSE; return 1; }
-    if (!strcmp(id, "steady") || !strcmp(id, "steadytx")) {
-        /* DaynaPORT's rhythm (hwsend12): a poll every 16 ms at every level, one frame per READ,
-         * no yield cut, no chase, no pause, no early poll after an inline WRITE; steadytx also
-         * with handshaked frame writes */
-        defaults(t);
-        t->burst_ms = t->mid_ms = t->idle_ms = 16; t->step_ms = 0;
-        t->flags = MP_TUNE_NOYIELD | MP_TUNE_NOCHASE;
-        t->flags2 = MP_TUNE2_NOPAUSE | MP_TUNE2_STEADY;
-        if (id[6]) t->blind_tx = 0;
+    if (!strcmp(id, "steadytx")) {      /* steady with handshaked frame writes (hwsend12) */
+        mp_lever_preset(t, "steady");
+        t->blind_tx = 0;
         return 1;
     }
     if (!strcmp(id, "newtx")) { defaults(t); t->blind_tx = 0; return 1; }
@@ -321,6 +313,6 @@ fin:
     ps[0] = (unsigned char)n;
     memcpy(ps + 1, g_line, n);
     ParamText(ps, (ConstStr255Param)"\p", (ConstStr255Param)"\p", (ConstStr255Param)"\p");
-    Alert(128, 0);
+    if (!runid_unattended()) Alert(128, 0);
     return 0;
 }

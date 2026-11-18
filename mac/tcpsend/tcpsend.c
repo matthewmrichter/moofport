@@ -11,6 +11,8 @@
  *   N  nostamp  A again with the diagnostic driver's clock reads off (what they cost); only
  *               with the hwsend diagnostic driver
  *   R  recv     1 MB from the bulk source 17030 (TcpBench's receive), with the tick loss
+ *   T  term     (MoofBatch only) 32 rounds against the terminal service 17032: send `k`, read until
+ *               2,000 bytes (25 lines of 80 bytes, one segment each) have come, the round timed
  * With the diagnostic driver every mode also lists the frames the driver wrote (the frame log,
  * mp_diag.h): "W time type id seq len port rc index/frames [b]" per frame, for
  * scripts/hwsend-lost.py to match against the host capture.
@@ -34,11 +36,17 @@
  * MoofBatch (the same source built with MP_BATCH, hwsend11): one run id, then every MoofTune
  * setting in "MoofBatch.cfg"'s second line ("settings new oldhush early0 noinline", the
  * default) in turn, set through the driver's MP_CTL_TUNE with no restart, and the modes for each
- * (default EACRAC). With DaynaPORT (no MoofPort counters) it runs the modes once as "dayna".
+ * (default EACRAC; "keep" applies nothing and uses what the driver has; the levers new
+ * (the boot defaults = old = 1.0's values), old, rx4, chase1, steady, steadyrx4,
+ * steadyack are mac/common/mp_levers.h, shared with MoofTune; oldhush, early0, noinline, old10,
+ * nopause, repoll change the 1.0 defaults).
+ * With DaynaPORT (no MoofPort counters) it runs the modes once as "dayna".
  * Before and after each test it sends "MARK <run> <setting> <n> <test> start|end" by UDP to the
  * PC's port 17040 (testnet.py logs it; scripts/hwsend-batch.py splits the capture by it). A
  * small window shows the setting, test N of M and the last result; it is redrawn only between
- * tests. Results: MoofBatch-<run id>.out. */
+ * tests. A line "rbuf <bytes>" (4096..32768, default 8192) sets the TCPCreate receive buffer
+ * (the TCP window); a value outside the range or not a number is refused: "rbuf: refused" and
+ * RESULT FAIL, nothing run. The header prints "rbuf: <bytes>". Results: MoofBatch-<run id>.out. */
 #include <Quickdraw.h>
 #include <Fonts.h>
 #include <Windows.h>
@@ -48,6 +56,7 @@
 #include <Memory.h>
 #include <Files.h>
 #include <Devices.h>
+#include <Resources.h>
 #include <Events.h>
 #include <OSUtils.h>
 #include <Timer.h>
@@ -57,6 +66,7 @@
 #include <stdint.h>
 #include "runid.h"
 #include "mp_drv.h"
+#include "mp_levers.h"
 #include "mp_diag.h"
 
 QDGlobals qd;
@@ -70,9 +80,20 @@ enum {
 #define ECHO_PORT   17007
 #define BULK_SINK   17031
 #define BULK_SRC    17030
+#define TERM_PORT   17032
+#define N_TERM      32
+#define TERM_BYTES  2000
 #define connectionClosing (-23005)
 #define commandTimeout    (-23016)
-#define RCVBUF_LEN  8192
+#define RECV_CHUNK  8192          /* R recv: bytes asked for per TCPRcv */
+#ifdef MP_BATCH
+#define RBUF_MIN    4096          /* MoofBatch.cfg "rbuf <bytes>": the TCPCreate receive buffer */
+#define RBUF_MAX    32768
+#define RBUF_DEF    8192
+#else
+#define RBUF_MAX    8192
+#define RBUF_DEF    8192
+#endif
 #define N_ECHO      64
 #define TOTAL       262144u
 #define SMALL       1400
@@ -104,12 +125,13 @@ static void p32(BenchPB *pb, int off, uint32_t v)
 
 static short g_ipp, g_enet;
 static uint32_t g_stream;
-static uint8_t g_strbuf[RCVBUF_LEN];
+static uint8_t g_strbuf[RBUF_MAX];
+static long g_rbuf = RBUF_DEF;    /* the length passed to TCPCreate */
 static uint8_t g_rcvbuf[64];
 static uint8_t g_data[BIG];
 static uint32_t g_host = HOST_IP;
 #ifdef MP_BATCH
-static char g_modes[16] = "EACRAC";
+static char g_modes[16] = "EACRTAC";
 #else
 static char g_modes[16] = "EABCRN";
 #endif
@@ -199,7 +221,7 @@ static int16_t tcp_create(void)
     int16_t r;
     memset(&pb, 0, sizeof pb);
     p32(&pb, 0, (uint32_t)(uintptr_t)g_strbuf);
-    p32(&pb, 4, (uint32_t)RCVBUF_LEN);
+    p32(&pb, 4, (uint32_t)g_rbuf);
     r = call(&pb, CS_CREATE);
     if (r == 0) g_stream = pb.tcpStream;
     return r;
@@ -236,19 +258,21 @@ static int16_t tcp_send(const uint8_t *data, uint16_t len, int push)
     return call(&pb, CS_SEND);
 }
 
-static int16_t tcp_rcv(uint16_t *got)
+static int16_t tcp_rcv_into(uint8_t *buf, uint16_t cap, uint16_t *got)
 {
     BenchPB pb;
     int16_t r;
     memset(&pb, 0, sizeof pb);
     pb.tcpStream = g_stream;
     p8(&pb, 0, 10);
-    p32(&pb, 4, (uint32_t)(uintptr_t)g_rcvbuf);
-    p16(&pb, 8, (uint16_t)sizeof g_rcvbuf);
+    p32(&pb, 4, (uint32_t)(uintptr_t)buf);
+    p16(&pb, 8, cap);
     r = call(&pb, CS_RCV);
     *got = (uint16_t)((pb.csParam[8] << 8) | pb.csParam[9]);
     return r;
 }
+
+static int16_t tcp_rcv(uint16_t *got) { return tcp_rcv_into(g_rcvbuf, (uint16_t)sizeof g_rcvbuf, got); }
 
 static void tcp_end(int abort)
 {
@@ -281,12 +305,120 @@ static int connect(const char *what, uint16_t port)
     return -1;
 }
 
+#ifdef MP_BATCH
+/* ---- which TCP stack: MoofTCP or MacTCP (the session reads the "stack:" line) ---- */
+
+/* The driver header of the first unit named ".IPP", found in the unit table without opening or
+ * calling anything (UTableBase 0x11C, UnitNtryCnt 0x1D2; as MoofTCP's mt_units.h and MoofDiag do).
+ * MoofTCP's private Status csCode 0x4D54 must never be sent to MacTCP's .IPP: under real MacTCP it
+ * never returns and hangs the tool. 24-bit addresses (System 6, 68000). */
+static const uint8_t *ipp_driver(void)
+{
+    uint8_t **const *tbl = *(uint8_t **const *volatile *)0x11C;
+    int n = *(volatile int16_t *)0x1D2, i;
+    if (!tbl) return 0;
+    tbl = (uint8_t **const *)((uintptr_t)tbl & 0x00FFFFFFu);
+    for (i = 0; i < n; i++) {
+        uint8_t **h = tbl[i];
+        const uint8_t *dce, *drv;
+        if (!h) continue;
+        h = (uint8_t **)((uintptr_t)h & 0x00FFFFFFu);
+        if (!*h) continue;
+        dce = (const uint8_t *)((uintptr_t)*h & 0x00FFFFFFu);
+        drv = *(const uint8_t *const *)dce;
+        if (!drv) continue;
+        drv = (const uint8_t *)((uintptr_t)drv & 0x00FFFFFFu);
+        if (dce[5] & 0x40) {                       /* dRAMBased: dCtlDriver is a handle */
+            drv = *(const uint8_t *const *)drv;
+            if (!drv) continue;
+            drv = (const uint8_t *)((uintptr_t)drv & 0x00FFFFFFu);
+        }
+        if (drv[18] == 4 && drv[19] == '.' && (drv[20] | 0x20) == 'i' && (drv[21] | 0x20) == 'p' &&
+            (drv[22] | 0x20) == 'p')
+            return drv;
+    }
+    return 0;
+}
+
+/* copied from mooftcp mac/include/mt_units.h (mt_units_is_moof); change there first.
+ * MoofTCP's driver: the open entry is at 0x18 and starts "moveq #0,d0; bra.s" (mt_units_is_moof). */
+static int is_moof(const uint8_t *drv)
+{
+    return drv && drv[8] == 0x00 && drv[9] == 0x18 && drv[24] == 0x70 && drv[25] == 0x00 &&
+           drv[26] == 0x60 && drv[27] == 0x14;
+}
+
+/* The short version string of 'vers' 1 in ":System Folder:MoofTCP" (MoofDiag's release_vers), or "?". The
+ * fork is opened read only; it is closed again only if it was not open already (an open fork returns
+ * the same refnum). */
+static void moof_release(char *out, size_t cap)
+{
+    static const unsigned char fname[] = "\pMoofTCP";
+    HParamBlockRec vp;
+    FCBPBRec fp;
+    Str255 nm, path;
+    short vref, res, save = CurResFile();
+    long dir;
+    int was_open = 0, idx;
+    Handle h;
+
+    strcpy(out, "?");
+    memset(&vp, 0, sizeof vp);
+    path[0] = 0;
+    vp.volumeParam.ioNamePtr = path;
+    vp.volumeParam.ioVRefNum = *(volatile short *)0x210;     /* BootDrive */
+    if (PBHGetVInfoSync(&vp) != noErr) return;
+    vref = vp.volumeParam.ioVRefNum;
+    dir = vp.volumeParam.ioVFndrInfo[0];                     /* the System Folder */
+    if (dir == 0) return;
+    for (idx = 1; idx < 64; idx++) {
+        memset(&fp, 0, sizeof fp);
+        nm[0] = 0;
+        fp.ioNamePtr = nm;
+        fp.ioVRefNum = vref;
+        fp.ioFCBIndx = idx;
+        if (PBGetFCBInfoSync(&fp) != noErr) break;
+        if (fp.ioFCBParID == dir && (fp.ioFCBFlags & 0x0200) && nm[0] == fname[0] &&
+            memcmp(nm + 1, fname + 1, nm[0]) == 0)
+            was_open = 1;
+    }
+    if (path[0] == 0 || path[0] > 27 + 1) return;
+    memcpy(path + 1 + path[0], ":System Folder:MoofTCP", 22);
+    path[0] = (unsigned char)(path[0] + 22);
+    res = OpenRFPerm(path, 0, fsRdPerm);                     /* read only: the System holds the fork too */
+    if (res < 0) return;
+    h = Get1Resource('vers', 1);
+    if (h && GetHandleSize(h) > 8) {
+        unsigned char *d = (unsigned char *)*h;
+        unsigned n = d[6];                                   /* 4 bytes number, region word, short string */
+        if (n > 0 && n < cap && 7 + n <= (unsigned)GetHandleSize(h)) {
+            memcpy(out, d + 7, n);
+            out[n] = 0;
+        }
+    }
+    if (!was_open) CloseResFile(res);
+    UseResFile(save);
+}
+
+static void stack_line(void)
+{
+    const uint8_t *drv = ipp_driver();
+    if (is_moof(drv)) {
+        char rv[40];
+        moof_release(rv, sizeof rv);
+        LOG("stack: MoofTCP %s\r", rv);
+    } else {
+        LOG("stack: MacTCP\r");
+    }
+}
+#endif
+
 /* ---- the driver's counters ---- */
 
 static MpStats g_s0, g_s1;
 static MpDiagStats g_dg;
 static MpWLog g_wl;
-static uint8_t g_bigbuf[RCVBUF_LEN];
+static uint8_t g_bigbuf[RECV_CHUNK];
 
 static int enet_status(int16_t cs, void *buf, int16_t len)
 {
@@ -475,7 +607,7 @@ static int cmp_u32(const void *a, const void *b)
 
 /* g_rec: the raw list (ms, one decimal), then min / median / mean / max and a histogram in
  * bins of `bin_ms`. */
-static void report(const char *what, int bin_ms)
+static void report(const char *what, int bin_ms, int term)
 {
     static uint32_t v[MAX_REC];
     uint32_t sum = 0;
@@ -495,9 +627,14 @@ static void report(const char *what, int bin_ms)
     memcpy(v, g_rec, sizeof v[0] * (size_t)n);
     qsort(v, (size_t)n, sizeof v[0], cmp_u32);
     for (i = 0; i < n; i++) sum += v[i];
-    LOG("  %s: %d chunks, min %lu us, median %lu, mean %lu, max %lu\r", what, n,
-        (unsigned long)v[0], (unsigned long)v[n / 2], (unsigned long)(sum / (uint32_t)n),
-        (unsigned long)v[n - 1]);
+    if (term)       /* T: rounds, with the nearest-rank p90 (the summarizer's) */
+        LOG("  %s: %d rounds, min %lu us, median %lu, p90 %lu, mean %lu, max %lu\r", what, n,
+            (unsigned long)v[0], (unsigned long)v[n / 2], (unsigned long)v[(9 * n + 9) / 10 - 1],
+            (unsigned long)(sum / (uint32_t)n), (unsigned long)v[n - 1]);
+    else
+        LOG("  %s: %d chunks, min %lu us, median %lu, mean %lu, max %lu\r", what, n,
+            (unsigned long)v[0], (unsigned long)v[n / 2], (unsigned long)(sum / (uint32_t)n),
+            (unsigned long)v[n - 1]);
     p = g_line;
     p += sprintf(p, "  histogram (%d ms bins, lower edge:count):", bin_ms);
     for (i = 0; i < n; ) {
@@ -539,7 +676,7 @@ static void mode_echo(void)
     }
     LOG("echo: %d ok, %d lost\r", g_nrec, lost);
     sprintf(g_last, "echo: %d ok, %d lost", g_nrec, lost);
-    report("echo RTT", 2);
+    report("echo RTT", 2, 0);
     mode_end();
     tcp_end(0);
 }
@@ -565,7 +702,7 @@ static void mode_sync(const char *name, uint16_t chunk, int push_last, int stamp
         sent += n;
     }
     rate(name, sent, ticks() - t0);
-    report(name, bin_ms);
+    report(name, bin_ms, 0);
     mode_end();
     diag_ctl(0, 1);
     tcp_end(0);
@@ -614,10 +751,42 @@ static void mode_async(void)
         k = (k + 1) % N_ASYNC;
     }
     rate("async", done, ticks() - t0);
-    report("async (between completions)", 2);
+    report("async (between completions)", 2, 0);
     mode_end();
     tcp_end(err != 0);
 }
+
+#ifdef MP_BATCH
+/* T: terminal output. Per round send one byte `k`; the host answers with 25 lines of 80 bytes, a
+ * segment each (testnet.py, TCP_NODELAY); read until all 2,000 bytes are in. The round is timed
+ * from before the send to the last byte, like an interactive screenful. `q` ends the session. */
+static void mode_term(void)
+{
+    int i, lost = 0;
+    LOG("-- T term: %d rounds of k -> %d bytes (25 lines of 80) from %d\r", N_TERM, TERM_BYTES, TERM_PORT);
+    if (connect("term", TERM_PORT)) return;
+    mode_begin(1);
+    g_nrec = 0;
+    for (i = 0; i < N_TERM; i++) {
+        uint8_t k = 'k';
+        uint32_t t0 = now_us(), have = 0;
+        int16_t r = tcp_send(&k, 1, 1);
+        while (r == 0 && have < TERM_BYTES) {
+            uint16_t got = 0;
+            r = tcp_rcv_into(g_bigbuf, (uint16_t)(TERM_BYTES - have), &got);
+            if (r == 0) have += got;
+        }
+        if (r == 0) rec(t0, now_us());
+        else { lost++; LOG("term round %d: error %d after %lu bytes\r", i + 1, (int)r, (unsigned long)have); break; }
+    }
+    LOG("term: %d ok, %d lost\r", g_nrec, lost);
+    sprintf(g_last, "term: %d ok, %d lost", g_nrec, lost);
+    report("term", 2, 1);
+    mode_end();
+    if (!lost) { uint8_t q = 'q'; (void)tcp_send(&q, 1, 1); }
+    tcp_end(lost != 0);
+}
+#endif
 
 static void mode_recv(void)
 {
@@ -635,7 +804,7 @@ static void mode_recv(void)
         pb.tcpStream = g_stream;
         p8(&pb, 0, 20);
         p32(&pb, 4, (uint32_t)(uintptr_t)g_bigbuf);
-        p16(&pb, 8, (uint16_t)RCVBUF_LEN);
+        p16(&pb, 8, (uint16_t)RECV_CHUNK);
         r = call(&pb, CS_RCV);
         got = (uint16_t)((pb.csParam[8] << 8) | pb.csParam[9]);
         if (r == 0) total += got;
@@ -712,15 +881,19 @@ static int apply_setting(const char *setting)
     if (n >= sizeof name) return -2;
     memcpy(name, setting, n);
     name[n] = 0;
+    if (!strcmp(name, "keep") && !polled) {
+        /* nothing applied: the driver keeps what it has (MoofTune, or the last setting), so a
+         * sweep driven from MoofTune can be measured */
+        LOG("keep: unchanged\r");
+        return 0;
+    }
     if (!enet_status(MP_STATUS_STATS, &g_s0, (int16_t)sizeof g_s0)) return -1;
     t = g_s0.tune;
     t.version = MP_TUNE_VERSION;
-    t.burst_ms = 5; t.hold_ms = 60; t.mid_ms = 17; t.quiet_ms = 2000; t.idle_ms = 51;
-    t.step_ms = 17; t.busy_ms = 2;
-    t.blind = 1; t.verify = 0; t.blind_tx = 1; t.flags = 0; t.early = MP_EARLY_OFF;
-    t.pad = 0; t.flags2 = 0; t.pad2 = 0;
-    if (!strcmp(name, "new")) {
-        /* the hwsend11 defaults: inline, first poll 5 ms after it, reply pause, no re-poll */
+    mp_tune_old(&t);        /* the older settings below change the 1.0 defaults */
+    if (mp_lever_preset(&t, name)) {
+        /* new and old (the boot defaults, 1.0's values), rx4, chase1, steady, steadyrx4, steadyack:
+         * mp_levers.h, the same as MoofTune's presets */
     } else if (!strcmp(name, "oldhush")) {
         t.flags = MP_TUNE_HUSH; t.flags2 = MP_TUNE2_NOPAUSE | MP_TUNE2_REPOLL;
     } else if (!strcmp(name, "early0")) {
@@ -733,12 +906,6 @@ static int apply_setting(const char *setting)
         t.flags2 = MP_TUNE2_NOPAUSE;
     } else if (!strcmp(name, "repoll")) {
         t.flags2 = MP_TUNE2_REPOLL;
-    } else if (!strcmp(name, "steady")) {
-        /* DaynaPORT's rhythm (MoofTune steady): a poll every 16 ms at every level, one frame per
-         * READ, no yield cut, chase, pause or early poll after an inline WRITE */
-        t.burst_ms = t.mid_ms = t.idle_ms = 16; t.step_ms = 0;
-        t.flags = MP_TUNE_NOYIELD | MP_TUNE_NOCHASE;
-        t.flags2 = MP_TUNE2_NOPAUSE | MP_TUNE2_STEADY;
     } else {
         return -2;
     }
@@ -788,28 +955,41 @@ static void run_mode(char m)
     case 'B': mode_sync("B sync8k", BIG, 1, 1, 20); break;
     case 'C': mode_async(); break;
     case 'R': mode_recv(); break;
+    case 'T': mode_term(); break;
     default: break;
     }
 }
 
+static int g_batch_fail;          /* no setting could be applied: the run is a FAIL */
+
 static void batch(void)
 {
     char list[128], *names[10], *p;
-    int ns = 0, s, i, k = 0, total, cnt[128];
+    int ns = 0, s, i, k = 0, total, cnt[128], ran = 0;
+    char skipped[128];
+    skipped[0] = 0;
     strcpy(list, g_mp ? g_settings : "dayna");
     for (p = strtok(list, " "); p && ns < 10; p = strtok(0, " ")) names[ns++] = p;
+    if (p) {                      /* more than 10: the rest never run (the plugin refuses such a cfg) */
+        int more = 0;
+        for (; p; p = strtok(0, " ")) more++;
+        LOG("settings: %d given, only the first 10 run\r", ns + more);
+    }
     total = ns * (int)strlen(g_modes);
     udp_open();
     for (s = 0; s < ns; s++) {
         LOG("== SETTING %s\r", names[s]);
         if (g_mp) {
             int r = apply_setting(names[s]);
-            if (r) { LOG("setting %s: not applied (%d), skipped\r", names[s], r); k += (int)strlen(g_modes); continue; }
+            if (r) { LOG("setting %s: not applied (%d), skipped\r", names[s], r); k += (int)strlen(g_modes);
+                if (strlen(skipped) + strlen(names[s]) + 2 < sizeof skipped) { strcat(skipped, " "); strcat(skipped, names[s]); }
+                continue; }
             enet_status(MP_STATUS_STATS, &g_s0, (int16_t)sizeof g_s0);
             LOG("tune: flags %02x early %u flags2 %02x blind_tx %u poll %u/%u/%u ms\r", g_s0.tune.flags,
                 g_s0.tune.early, g_s0.tune.flags2, g_s0.tune.blind_tx, g_s0.tune.burst_ms,
                 g_s0.tune.mid_ms, g_s0.tune.idle_ms);
         }
+        ran++;
         memset(cnt, 0, sizeof cnt);
         for (i = 0; g_modes[i]; i++) {
             char m = g_modes[i];
@@ -821,7 +1001,14 @@ static void batch(void)
         }
     }
     udp_close();
+    if (!ran) g_batch_fail = 1;
+    else if (skipped[0]) LOG("skipped settings:%s\r", skipped);
 }
+#endif
+
+#ifdef MP_BATCH
+static char g_rbuf_txt[16];       /* the cfg's rbuf value as written, for the refusal line */
+static int g_rbuf_bad;
 #endif
 
 static void read_cfg(void)
@@ -839,7 +1026,10 @@ static void read_cfg(void)
         int a, b, c, d, k;
         if (FSOpen((ConstStr255Param)names[i], 0, &r) != noErr) continue;
         GetEOF(r, &len);
-        if (len > 159) len = 159;
+        if (len > 159) {
+            LOG("%.*s: %ld bytes, only the first 159 are read\r", (int)names[i][0], (const char *)names[i] + 1, len);
+            len = 159;
+        }
         FSRead(r, &len, (Ptr)buf);
         FSClose(r);
         buf[len] = 0;
@@ -853,7 +1043,28 @@ static void read_cfg(void)
             if (!l2) l2 = strchr(buf, '\n');
             if (l2 && i == 0 && !strncmp(l2 + 1, "settings ", 9)) {
                 strncpy(g_settings, l2 + 10, sizeof g_settings - 1);
+                if (strcspn(l2 + 10, "\r\n") > sizeof g_settings - 1)
+                    LOG("settings line is longer than %d characters, cut\r", (int)sizeof g_settings - 1);
                 g_settings[strcspn(g_settings, "\r\n")] = 0;
+            }
+            if (i == 0) {               /* a line "rbuf <bytes>" after the first */
+                char *p = buf;
+                while ((p = strpbrk(p, "\r\n")) != 0) {
+                    p++;
+                    if (!strncmp(p, "rbuf ", 5)) {
+                        char *e;
+                        long v;
+                        strncpy(g_rbuf_txt, p + 5, sizeof g_rbuf_txt - 1);
+                        g_rbuf_txt[strcspn(g_rbuf_txt, "\r\n")] = 0;
+                        {
+                            size_t n = strlen(g_rbuf_txt);
+                            while (n > 0 && (g_rbuf_txt[n - 1] == ' ' || g_rbuf_txt[n - 1] == '\t')) g_rbuf_txt[--n] = 0;
+                        }
+                        v = strtol(g_rbuf_txt, &e, 10);
+                        if (e == g_rbuf_txt || *e || v < RBUF_MIN || v > RBUF_MAX) g_rbuf_bad = 1;
+                        else g_rbuf = v;
+                    }
+                }
             }
         }
 #endif
@@ -896,10 +1107,21 @@ int main(void)
 #endif
     read_cfg();
     LOG("host %08lx, modes %s, start tick %lu\r", (unsigned long)g_host, g_modes, ticks());
+#ifdef MP_BATCH
+    if (g_rbuf_bad) {
+        LOG("rbuf: refused \"%s\" (need a number %d..%d)\r", g_rbuf_txt, RBUF_MIN, RBUF_MAX);
+        wr("RESULT FAIL\r");
+        goto fin;
+    }
+    LOG("rbuf: %ld\r", g_rbuf);
+#endif
     for (i = 0; i < (int)sizeof g_data; i++) g_data[i] = (uint8_t)i;
 
     if (OpenDriver((ConstStr255Param)"\p.IPP", &g_ipp)) { LOG("OpenDriver(.IPP) failed (is MacTCP installed?)\r"); goto fin; }
     probe_driver();
+#ifdef MP_BATCH
+    stack_line();
+#endif
     clk_start();
     LOG("stopwatch: one read costs %lu us (Time Manager %s)\r", (unsigned long)g_lap,
         g_lap < 2000 ? "ok" : "SUSPECT");
@@ -925,6 +1147,9 @@ int main(void)
     }
     clk_stop();
     LOG("end tick %lu\r", ticks());
+#ifdef MP_BATCH
+    if (g_batch_fail) wr("RESULT FAIL no setting could be applied\r"); else
+#endif
     wr("RESULT DONE\r");
 fin:
     if (g_outref >= 0) { FSClose(g_outref); g_outref = -1; }
@@ -939,6 +1164,6 @@ fin:
     ps[0] = (unsigned char)n;
     memcpy(ps + 1, g_line, n);
     ParamText(ps, (ConstStr255Param)"\p", (ConstStr255Param)"\p", (ConstStr255Param)"\p");
-    Alert(128, 0);
+    if (!runid_unattended()) Alert(128, 0);
     return 0;
 }

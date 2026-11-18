@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Verify the release artifacts with readers that did not write them (port of MoofTCP's).
-#   release-verify.sh [--self-test] <version>      e.g. release-verify.sh 1.0
+#   release-verify.sh [--self-test] <version>      e.g. release-verify.sh 2
 # Reads dist/MoofPort-<version>.sit.hqx  (macutils hexbin, and unar),
 #       dist/MoofPort-<version>.sit      (unar),
 #       dist/MoofPort-<version>.dsk      (hfsutils hmount/hls/hcopy -m),

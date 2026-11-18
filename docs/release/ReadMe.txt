@@ -1,5 +1,5 @@
-MoofPort 1.0
-============
+MoofPort 2
+==========
 
 MoofPort is an Ethernet driver (.ENET0) for the Wi-Fi of the
 BlueSCSI v2 (DaynaPORT emulation) on a Macintosh Classic with
@@ -19,6 +19,44 @@ This folder contains these files:
   - Read Me: this text.
 
 
+NEW IN 2
+
+MoofPort now numbers its releases 1.0, 2, 3, ... This is
+the second release.
+
+MoofPort 2 starts with the same timing settings as 1.0, so
+under MacTCP it works as 1.0 did.
+
+MoofTCP 1.1 switches MoofPort to its "steadyack" setting when
+it opens the driver. Measured on a real Mac Classic over the
+BlueSCSI v2 Wi-Fi (medians, timed on the PC): MoofTCP 1.1 with
+MoofPort 2, against 1.0's behaviour (the MoofTCP 1.0 engine,
+with MoofPort at 1.0's settings). The gains come from both
+together: MoofTCP 1.1's shorter path and MoofPort's
+"steadyack" timing.
+
+                          1.0           2
+  Echo round trip         53.6 ms       41.4 ms
+  Terminal burst,         153.6 ms      124.6 ms
+    2,000 bytes
+  TCP receive, 1 MB       45.3 KB/s     55.6 KB/s
+
+Measured 2026-11-14, 10 pairs in one session, with the
+AppleShare server's Wi-Fi power saving off; these three were
+better in all 10 pairs. Not significant that day: TCP send
+with 4 sends queued (36.7 -> 41.0 KB/s), one-at-a-time sends
+(25.2 -> 23.9 KB/s) and AppleShare copies (too few pairs). The
+network was noisy that day, and the figures vary with the
+network.
+
+To go back to 1.0: open the 1.0 MoofPortInstall, click Update
+(it installs its own driver whatever version is installed),
+and restart.
+
+MoofPort 2 uses 17,560 bytes of system memory (measured in
+the emulator; 1.0 used 17,528).
+
+
 REQUIREMENTS
 
   - A Macintosh Classic, Plus or SE (a 68000 Mac with the same
@@ -34,8 +72,8 @@ REQUIREMENTS
     SCSI/Link is installed, MoofPort replaces its driver in the
     System file. MoofPort keeps the DaynaPORT driver for
     Uninstall.
-  - System memory: MoofPort uses 17,528 bytes. The DaynaPORT
-    driver uses 16,554 bytes.
+  - System memory: MoofPort uses 17,560 bytes (measured in the
+    emulator). The DaynaPORT driver uses 16,554 bytes.
 
 
 ETHERTALK WITHOUT DAYNAPORT DISKS
@@ -106,7 +144,7 @@ EtherTalk, keep EtherTalk selected in the Network control panel.
 
 UPDATE
 
-Use this procedure if MoofPort 1.0b1 or a different older
+Use this procedure if MoofPort 1.0 or a different older
 MoofPort is installed. MoofPortInstall then shows Update.
 
   1. Open MoofPortInstall.
@@ -153,13 +191,20 @@ MoofTune changes the MoofPort timing until the next restart.
      name.
   3. Click OK.
 
-  default   The MoofPort 1.0 settings (the settings after a
-            restart).
+  default   The settings after a restart, the same as 1.0's:
+            check every 5 ms during traffic, every 17 ms
+            (51 ms when idle) otherwise, and 5 ms after each
+            packet sent. The same as "new" and "old".
+  steadyack Check the network every 16 ms, and once more 2 ms
+            after each packet sent. MoofTCP 1.1 applies this
+            setting itself when it opens MoofPort; under
+            MacTCP it was slower than "default".
   noinline  Send each packet in the next network check, not at
             once (the 1.0b1 method). Fewer lost packets in
             some tests, slower one-at-a-time sends.
   steady    Check the network every 16 ms, one packet at a
-            time, as DaynaPORT does. Receive is approximately
+            time, with no extra check after a send, as
+            DaynaPORT does. Receive is approximately
             30% slower.
   tick      Check the network once per tick, always (0.3d3).
   txpolled  Handshake every byte of each packet that goes to
@@ -175,6 +220,8 @@ Measured on a real Mac Classic (8 MHz 68000, 4 MB, System 6.0.8,
 MacTCP 2.1) on 2026-11-10, in one session. DaynaPORT 1.2.5 and
 MoofPort 1.0 alternated in blocks, so both had the same Wi-Fi
 conditions. The PC measured the times. The figures are medians.
+MoofPort 2 starts with the same settings as 1.0. For MoofPort 2
+with MoofTCP 1.1, see NEW IN 2.
 
                           MoofPort 1.0  DaynaPORT 1.2.5
   TCP receive, 1 MB       61.5 KB/s     46.9 KB/s  (+31%)
@@ -211,6 +258,17 @@ KNOWN ISSUES
     DaynaPORT driver has the same loss on the same hardware.
   - If you hold Shift at start-up, MoofPort stays active.
     MoofPort is in the System file, not in an extension.
+  - AppleShare volumes set to open at start-up may not mount. At
+    start-up AppleShare finds the server with AppleTalk
+    multicast lookups (4 tries in about 2 seconds, no retry). On
+    Wi-Fi these are lost far more often than normal traffic. On
+    the test setup, with the server's Wi-Fi power saving on,
+    about 1 boot in 7 to 1 in 3 failed; with it off, none of 15
+    at night but up to 1 in 3 at busy times of day. Stock MacTCP
+    with the DaynaPORT driver fails the same way. It is not
+    caused by MoofPort or MoofTCP. Open the volume from the
+    Chooser; to make it rarer, use a wired connection for the
+    server or turn its Wi-Fi power saving off.
 
 
 TROUBLESHOOTING

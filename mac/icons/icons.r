@@ -30,7 +30,7 @@ data 'ics#' (128) {
     $"001F441F 441F7C1F 7FFFFFFE FFFEFFFC"
     $"FFFC0FFC 06D806D8 06DC001E 003F003F"
 };
-data 'MPIN' (0) { $"13" "MoofPortInstall 1.0" };
+data 'MPIN' (0) { $"11" "MoofPortInstall 2" };
 resource 'FREF' (128) { 'APPL', 0, "" };
 resource 'BNDL' (128) {
     'MPIN', 0,
@@ -68,7 +68,7 @@ data 'ics#' (128) {
     $"001F441F 441F7C1F 7FFFFFFE FFFEFFFC"
     $"FFFC0FFC 06D806D8 06FF003F 003F003F"
 };
-data 'MPTU' (0) { $"0C" "MoofTune 1.0" };
+data 'MPTU' (0) { $"0A" "MoofTune 2" };
 resource 'FREF' (128) { 'APPL', 0, "" };
 resource 'BNDL' (128) {
     'MPTU', 0,
@@ -106,7 +106,7 @@ data 'ics#' (128) {
     $"001F441F 441F7C1F 7FFFFFFE FFFEFFFC"
     $"FFFC0FFC 06D806D8 06FF003F 003F003F"
 };
-data 'MPST' (0) { $"0C" "MoofStat 1.0" };
+data 'MPST' (0) { $"0A" "MoofStat 2" };
 resource 'FREF' (128) { 'APPL', 0, "" };
 resource 'BNDL' (128) {
     'MPST', 0,

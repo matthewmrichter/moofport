@@ -20,16 +20,19 @@
  *             tick comes at once. A tick stays well under one VBL period, so the
  *             60 Hz tick (Ticks, the System's timers) is not lost (hwsend: 65% lost when ticks
  *             ran 20-37 ms with 13 ms WRITEs inside MacTCP's interrupt-level EWrites).
- *             The interval comes from the core's mp_poll. 1.0 defaults (decision 6): 5 ms for
- *             60 ms after traffic (hw6: receive +9%), one tick until 2 s of quiet, then out to
- *             three ticks (hw6: 36% fewer empty polls on an idle Mac). Every empty READ costs
- *             about 3.3 ms of CPU on the Classic (hw4), which is why the burst is short and the
- *             idle rate low; a 3 ms burst cut TCP send to a third (hw3).
+ *             The interval comes from the core's mp_poll. The boot tune (mp_tune_boot in
+ *             mp_drv.h) is the 1.0 defaults (decision 6; MoofPort 2 keeps them, MoofTCP 1.1 applies
+ *             "steadyack" itself): 5 ms for 60 ms after traffic (hw6:
+ *             receive +9%), one tick until 2 s of quiet, then out to three ticks (hw6: 36% fewer
+ *             empty polls on an idle Mac); MoofTune/MoofBatch "old" is the same. Every
+ *             empty READ costs about 3.3 ms of CPU on the Classic (hw4); a 3 ms burst cut TCP
+ *             send to a third (hw3).
  *   EWrite    copies the frame into the TX ring and completes at once; the poll task sends it
  *             about a millisecond later (kick), and polls at burst_ms after it for the reply.
  *             MacTCP calls EWrite at interrupt level, so a WRITE done there (5-13 ms) held off
- *             every other interrupt. MoofTune inline (hwsend7, off by default): with nothing
- *             queued, an interrupt-level EWrite does that one WRITE itself, as DaynaPORT does. When both TX slots are full an async call stays pending
+ *             every other interrupt. Inline WRITE (hwsend7; on in the boot tune, MoofTune noinline
+ *             turns it off): with nothing queued, an interrupt-level EWrite does that one WRITE
+ *             itself, as DaynaPORT does. When both TX slots are full an async call stays pending
  *             (all of MacTCP's EWrites are async, docs/dev/INTERFACE.md section 4): the Device
  *             Manager holds the calls behind it, so order is kept, and the poll task copies the
  *             frame and completes the call with IODone once a slot is free. A sync call made at
@@ -78,18 +81,13 @@
 
 #define RX_SLOTS   3              /* PLAN 2.4 default: 3 RX + 2 TX */
 #define TX_SLOTS   2
-/* 1.0 defaults (decision 6, after hw6): 5 ms for 60 ms after traffic, one tick until 2 s of
- * quiet, then one more tick per poll up to three. MP_CTL_TUNE changes them (MoofTune presets). */
-#define BURST_MS   5
-#define HOLD_MS    60
-#define MID_MS     17             /* one tick, DaynaPORT's rate */
-#define QUIET_MS   2000
-#define IDLE_MS    51             /* three ticks */
-#define STEP_MS    17
-#define BUSY_MS    2              /* retry delay when the SCSI Manager is busy */
+/* The boot-time tune is mp_tune_boot() in mp_drv.h: the 1.0 values (5 ms bursts, 17/51 ms ticks),
+ * MoofTune/MoofBatch "old" = "new"; "steadyack" (16 ms polls, a quick poll after a WRITE) is applied by MoofTCP 1.1.
+ * MP_CTL_TUNE changes them at run time (MoofTune presets). */
 #define TX_MS      1              /* an EWrite brings the next tick this close */
-#define ACK_MS     5              /* the first poll after a WRITE, and no READ sooner (hwsend5: READs
-                                     2 ms after a WRITE went with lost frames; MoofTune ack2) */
+#define ACK_MS     5              /* the first poll after a WRITE, and no READ sooner, when MP_TUNE_ACK2
+                                     is off (hwsend5: READs 2 ms after a WRITE went with lost frames in
+                                     1.0; steadyack, which MoofTCP 1.1 applies, sets ACK2) */
 #define HUSH_MS    15             /* MoofTune hush (hwsend8): no poll this long after any reply */
 #define PAUSE_MS   12             /* the reply pause: under MacTCP's ~13.5 ms to its next send */
 #define CHASE_N    3              /* then up to this many more polls ack_ms apart until it comes */
@@ -169,7 +167,7 @@ typedef struct MpDrv {
     uint8_t early;                /* MP_EARLY_*: how an inline WRITE's reply is chased (MoofTune chase*) */
     uint8_t cms;                  /* the chase's spacing: ack_ms after a tick's WRITE, 1-2 after inline */
     uint8_t flags2;               /* MpTune.flags2: MP_TUNE2_NOPAUSE, MP_TUNE2_REPOLL */
-    uint8_t tflags;               /* MpTune.flags as last set (0 = the defaults), for Status */
+    uint8_t tflags;               /* MpTune.flags as last set (the boot tune: 0; steadyack: NOYIELD|NOCHASE|ACK2 = 0x1C), for Status */
     uint32_t kicks, v_ok, v_bad, v_big;
     struct EPB *parked;           /* an EWrite waiting for a free TX slot */
     void *dce;                    /* ... its DCE, for IODone */
@@ -438,19 +436,37 @@ static void kick(MpDrv *d, uint16_t ms)
     __asm__ volatile("move.w %0,%%sr" : : "d"(sr) : "memory", "cc");
 }
 
-static void tune_defaults(mp_poll_cfg *c)
+/* ---- Control ---- */
+
+/* Set every MpTune field (MP_CTL_TUNE, and the boot-time tune at open). */
+static void apply_tune(MpDrv *d, const MpTune *u)
 {
-    mp_poll_defaults(c);
-    c->burst_ms = BURST_MS;
-    c->hold_ms = HOLD_MS;
-    c->idle_ms = IDLE_MS;
-    c->step_ms = STEP_MS;
-    c->mid_ms = MID_MS;
-    c->quiet_ms = QUIET_MS;
-    c->busy_ms = BUSY_MS;
+    mp_poll_cfg c;
+    c.burst_ms = u->burst_ms;
+    c.hold_ms = u->hold_ms;
+    c.idle_ms = u->idle_ms;
+    c.step_ms = u->step_ms;
+    c.mid_ms = u->mid_ms;
+    c.quiet_ms = u->quiet_ms;
+    c.busy_ms = u->busy_ms;
+    mp_poll_init(&d->poll, &c, now_ms());   /* clamps out-of-range values */
+    d->scsi.blind = u->blind ? 1 : 0;
+    d->scsi.blind_tx = u->blind_tx ? 1 : 0;
+    d->tx.batch = !(u->flags & MP_TUNE_NOBATCH);
+    d->rx_budget = (u->flags & MP_TUNE_RX4) ? 4 : RX_BUDGET;
+    d->inline_tx = !(u->flags & MP_TUNE_NOINLINE);
+    d->early = u->early;
+    d->flags2 = u->flags2;
+    d->tflags = u->flags;       /* as set, for Status (MP_TUNE_* minus the old hush widths) */
+    DIAG(d->test_spin = u->pad;)
+    d->hush = (uint8_t)(u->flags & MP_TUNE_HUSH);
+    d->ack_ms = (u->flags & MP_TUNE_ACK2) ? 2 : ACK_MS;
+    d->cms = d->ack_ms;
+    d->yield = !(u->flags & MP_TUNE_NOYIELD);
+    d->chase = (u->flags & MP_TUNE_NOCHASE) ? 0xFF : 0;
+    d->verify = u->verify ? 1 : 0;
 }
 
-/* ---- Control ---- */
 
 /* Count every Control call by csCode. */
 static void log_call(MpDrv *d, int16_t cs)
@@ -680,32 +696,9 @@ static int16_t control(MpDrv *d, EPB *pb, void *dce)
         return addmulti(d, pb);
     case MP_CTL_TUNE: {
         const MpTune *u = (const MpTune *)pb->ePointer;
-        mp_poll_cfg c;
         if (!u || u->version != MP_TUNE_VERSION)
             return controlErr;
-        c.burst_ms = u->burst_ms;
-        c.hold_ms = u->hold_ms;
-        c.idle_ms = u->idle_ms;
-        c.step_ms = u->step_ms;
-        c.mid_ms = u->mid_ms;
-        c.quiet_ms = u->quiet_ms;
-        c.busy_ms = u->busy_ms;
-        mp_poll_init(&d->poll, &c, now_ms());   /* clamps out-of-range values */
-        d->scsi.blind = u->blind ? 1 : 0;
-        d->scsi.blind_tx = u->blind_tx ? 1 : 0;
-        d->tx.batch = !(u->flags & MP_TUNE_NOBATCH);
-        d->rx_budget = (u->flags & MP_TUNE_RX4) ? 4 : RX_BUDGET;
-        d->inline_tx = !(u->flags & MP_TUNE_NOINLINE);
-        d->early = u->early;
-        d->flags2 = u->flags2;
-        d->tflags = u->flags;       /* as set, for Status (MP_TUNE_* minus the old hush widths) */
-        DIAG(d->test_spin = u->pad;)
-        d->hush = (uint8_t)(u->flags & MP_TUNE_HUSH);
-        d->ack_ms = (u->flags & MP_TUNE_ACK2) ? 2 : ACK_MS;
-        d->cms = d->ack_ms;
-        d->yield = !(u->flags & MP_TUNE_NOYIELD);
-        d->chase = (u->flags & MP_TUNE_NOCHASE) ? 0xFF : 0;
-        d->verify = u->verify ? 1 : 0;
+        apply_tune(d, u);
         return noErr;
     }
 #ifdef MP_DIAG
@@ -768,21 +761,12 @@ int16_t mp_drv_open(void *pb, void *dce)
     mp_rx_init(&d->rx, &d->rxr);
     mp_rx_set_full(&d->rx, full_cb, d);
     mp_tx_init(&d->tx, &d->txr, d->mac, 1);   /* batched WRITEs (MoofTune nobatch: one per WRITE) */
-    d->rx_budget = RX_BUDGET;
-    d->ack_ms = ACK_MS;
-    d->cms = ACK_MS;
-    d->chase = 0;
-    d->yield = 1;
-    d->inline_tx = 1;               /* hwsend8: A +27%, C and AppleShare unchanged, no frames lost */
-    d->early = MP_EARLY_OFF;        /* hwsend10: the chase's early READs were empty, echo +10 ms */
-    d->flags2 = 0;                  /* the reply pause on, no re-poll after a yield cut */
-    d->tflags = 0;
     mp_demux_init(&d->dm);
     memset(&d->calls, 0, sizeof d->calls);
     {
-        mp_poll_cfg c;
-        tune_defaults(&c);
-        mp_poll_init(&d->poll, &c, now_ms());
+        MpTune t;
+        mp_tune_boot(&t);           /* 1.0's values (mp_drv.h) */
+        apply_tune(d, &t);
     }
     DIAG(mp_diag_open(&d->dg);)
     DIAG(d->scsi.dg = &d->dg;)
@@ -792,7 +776,7 @@ int16_t mp_drv_open(void *pb, void *dce)
     InsTime((QElemPtr)&d->t[0].tm);
     InsTime((QElemPtr)&d->t[1].tm);
     d->opened = 1;
-    prime(d, &d->t[0], IDLE_MS);
+    prime(d, &d->t[0], d->poll.c.idle_ms);
     d->wdv.qType = vType;
     d->wdv.vblAddr = (ProcPtr)mp_wd_entry;
     d->wdv.vblCount = 6;

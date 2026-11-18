@@ -5,7 +5,7 @@ corruption caused by a crafted packet.
 
 ## Supported versions
 
-Only the latest release (1.0 at the time of writing) is supported.
+Only the latest release (2 at the time of writing) is supported. Releases are numbered 1.0, 2, 3, ...
 
 ## Reporting a vulnerability
 

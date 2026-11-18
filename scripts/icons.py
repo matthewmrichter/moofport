@@ -15,6 +15,7 @@ import sys
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 SRC = os.path.join(ROOT, "mac", "icons", "moofport.icn.txt")
 OUT = os.path.join(ROOT, "mac", "icons", "icons.r")
+VERSION = "2"   # the application signature strings ("MoofTune 2"); release versions are integers since 2
 # application -> (resource id base, creator); the badge of the same name
 APPS = [("installer", "MoofPortInstall", "MPIN"), ("tune", "MoofTune", "MPTU"),
         ("stat", "MoofStat", "MPST")]
@@ -101,7 +102,7 @@ def rez(secs):
         out.append("    /* mask */")
         out.append(hexlines(bits(small, lambda c: c != " "), 16))
         out.append("};")
-        sig = "%s 1.0" % name
+        sig = "%s %s" % (name, VERSION)
         out.append("data '%s' (0) { $\"%02X\" \"%s\" };" % (creator, len(sig), sig))
         out.append("resource 'FREF' (128) { 'APPL', 0, \"\" };")
         out.append("resource 'BNDL' (128) {\n    '%s', 0,\n    {\n        'ICN#', { 0, 128 };\n"

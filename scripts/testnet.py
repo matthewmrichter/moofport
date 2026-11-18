@@ -9,6 +9,9 @@ plus two bulk-throughput services:
   TCP 17023  banner   - sends a short banner on connect, then echoes (like MoofTCP's)
   TCP 17030  bulk source - on connect, sends BULK_BYTES bytes as fast as it can, then closes
   TCP 17031  bulk sink   - reads until the peer closes, then logs total bytes and bytes/s
+  TCP 17032  term     - terminal-style output (MoofBatch test T): on each `k` writes 25 lines of
+                        80 bytes, one send per line (TCP_NODELAY); `q` closes. Logs per round the
+                        time from the `k` to the last write
   UDP 17007  echo     - echoes each datagram back to its sender
   UDP 17009  discard  - reads and drops each datagram
   UDP 17040  markers  - logs each datagram ("MARK <run> <setting> <n> <test> start|end", sent by
@@ -36,6 +39,8 @@ MARK_PORT = 17040
 BANNER_PORT = 17023
 BULK_SRC_PORT = 17030
 BULK_SINK_PORT = 17031
+TERM_PORT = int(os.environ.get("TESTNET_TERM_PORT", "17032"))
+TERM_LINES = 25
 
 BANNER = b"MoofPort test host\r\nlogin: "
 BULK_BYTES = int(os.environ.get("BULK_BYTES", str(1024 * 1024)))
@@ -189,6 +194,41 @@ def bulk_sink_handler(conn, addr):
            st.text()))
 
 
+def term_line(i):
+    """One 80-byte line (79 characters and a newline)."""
+    return (b"%02d term " % i + b"abcdefghijklmnopqrstuvwxyz0123456789" * 3)[:79] + b"\n"
+
+
+def term_handler(conn, addr):
+    """MoofBatch test T: every `k` gets TERM_LINES lines of 80 bytes, a send per line, so a Mac sees
+    a stream of small segments like a terminal's; `q` (or EOF) ends it."""
+    conn.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1)
+    lines = [term_line(i) for i in range(TERM_LINES)]
+    rounds, times = 0, []
+    done = False
+    while not done:
+        data = conn.recv(64)
+        if not data:
+            break
+        for b in data:
+            if b == ord("q"):
+                done = True
+                break
+            if b != ord("k"):
+                continue
+            t0 = time.time()
+            for ln in lines:
+                conn.sendall(ln)
+            dt = time.time() - t0
+            rounds += 1
+            times.append(dt)
+            log("TCP %d term round %d: k to the last write %.2f ms" % (TERM_PORT, rounds, dt * 1000))
+    if rounds:
+        times.sort()
+        log("TCP %d term: %d rounds, k to the last write min %.2f ms, median %.2f ms, max %.2f ms, to %s"
+            % (TERM_PORT, rounds, times[0] * 1000, times[len(times) // 2] * 1000, times[-1] * 1000, addr[0]))
+
+
 def serve_udp(port, drop):
     s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
@@ -212,23 +252,30 @@ def serve_marks(port):
 
 def main():
     global BULK_BYTES
+    only_term = False
     for arg in sys.argv[1:]:
-        if arg.startswith("--bulk="):
+        if arg == "--only-term":        # just the terminal service, on TESTNET_TERM_PORT (the host test)
+            only_term = True
+        elif arg.startswith("--bulk="):
             BULK_BYTES = int(arg.split("=", 1)[1])
         else:
             sys.stderr.write("testnet.py: unknown argument %r\n" % arg)
             return 2
     log("testnet.py starting (bulk size %d bytes)" % BULK_BYTES)
     threads = [
-        threading.Thread(target=serve_tcp, args=(ECHO_PORT, echo_handler), daemon=True),
-        threading.Thread(target=serve_tcp, args=(DISCARD_PORT, discard_handler), daemon=True),
-        threading.Thread(target=serve_tcp, args=(BANNER_PORT, banner_handler), daemon=True),
-        threading.Thread(target=serve_tcp, args=(BULK_SRC_PORT, bulk_source_handler), daemon=True),
-        threading.Thread(target=serve_tcp, args=(BULK_SINK_PORT, bulk_sink_handler), daemon=True),
-        threading.Thread(target=serve_udp, args=(ECHO_PORT, False), daemon=True),
-        threading.Thread(target=serve_udp, args=(DISCARD_PORT, True), daemon=True),
-        threading.Thread(target=serve_marks, args=(MARK_PORT,), daemon=True),
+        threading.Thread(target=serve_tcp, args=(TERM_PORT, term_handler), daemon=True),
     ]
+    if not only_term:
+        threads += [
+            threading.Thread(target=serve_tcp, args=(ECHO_PORT, echo_handler), daemon=True),
+            threading.Thread(target=serve_tcp, args=(DISCARD_PORT, discard_handler), daemon=True),
+            threading.Thread(target=serve_tcp, args=(BANNER_PORT, banner_handler), daemon=True),
+            threading.Thread(target=serve_tcp, args=(BULK_SRC_PORT, bulk_source_handler), daemon=True),
+            threading.Thread(target=serve_tcp, args=(BULK_SINK_PORT, bulk_sink_handler), daemon=True),
+            threading.Thread(target=serve_udp, args=(ECHO_PORT, False), daemon=True),
+            threading.Thread(target=serve_udp, args=(DISCARD_PORT, True), daemon=True),
+            threading.Thread(target=serve_marks, args=(MARK_PORT,), daemon=True),
+        ]
     for t in threads:
         t.start()
     try:

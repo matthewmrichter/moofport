@@ -25,7 +25,8 @@ MoofTune changes the MoofPort timing until the next restart. To use a setting:
 
 | Name       | What it does                                                                                                                              |
 | ---------- | ----------------------------------------------------------------------------------------------------------------------------------------- |
-| `default`  | MoofPort 1.0's settings (what you get after a restart)                                                                                    |
+| `default`  | the settings after a restart, MoofPort 1.0's: check every 5 ms in traffic, every 17 ms (51 ms idle) otherwise, 5 ms after each packet sent; `new` and `old` are the same |
+| `steadyack`| check every 16 ms, and once more 2 ms after each packet sent; MoofTCP 1.1 applies it itself when it opens MoofPort (under MacTCP it was slower than `default`) |
 | `noinline` | send each packet in the next network check instead of at once (1.0b1's way; fewer lost packets in some tests, slower one-at-a-time sends) |
 | `steady`   | check the network every 16 ms, one packet at a time, as DaynaPORT does (receive about 30% slower)                                         |
 | `tick`     | check the network once per tick, always (0.3d3)                                                                                           |
