@@ -44,6 +44,7 @@ Mac (Retro68 in Docker) and Snow:
     scripts/phase0-run.sh [--no-spy] [--no-testnet] [--keep-disk]   # test kit on a fresh disk + Snow
     scripts/testnet.py                 # host TCP/UDP echo, discard, banner and bulk services (17007...17031)
     scripts/release.sh [--force] [--no-build] <ver>   # dist/MoofPort-<ver>.{dsk,sit,sit.hqx,sha256}; docs/dev/RELEASE.md
+                                       # <ver> is a whole number (2, 3, ...; rc: 2rc1), tag v<ver>; see RELEASE.md Versioning
     scripts/release-verify.sh [--self-test] <ver>     # reads every format back with independent tools
     scripts/stage-hw.sh [--spec s.md] <session> <x.bin>...   # stage a hardware-test kit in dist/hw/ (docs/dev/HARDWARE.md)
     scripts/icons.py rez|preview out.png   # mac/icons/moofport.icn.txt -> icons.r

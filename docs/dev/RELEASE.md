@@ -17,6 +17,26 @@ release is three files plus a checksum file, all holding the same four items:
 | `MoofTune` | APPL/MPTU | 0x2000 | `build-mac/MoofTune.bin` |
 | `Read Me` | ttro/ttxt | 0 | `docs/release/ReadMe.txt`, CR line endings, no resource fork |
 
+## Versioning
+
+Releases are numbered with whole numbers: 1.0 was the first release (tag `v1.0`, kept as it is), then 2, 3, ...
+There are no minor or patch numbers; every release, however small, takes the next number.
+
+| | Final | Release candidate |
+|---|---|---|
+| `<v>` for `release.sh`, file names | `2` (`MoofPort-2.sit.hqx`) | `2rc1` (`MoofPort-2rc1.sit.hqx`) |
+| Git tag | `v2` | `v2rc1` |
+| `'vers'` 1 numeric fields (`mac/driver/moofport.r`, `mac/installer/installer.r`) | `0x02, 0x00, release, 0x00` | `0x02, 0x00, beta, 0x01` (stage `beta`, the rc number in the last field) |
+| `'vers'` 1 strings | `"2"`, `"MoofPort 2"` / `"MoofPort 2 installer"` | `"2rc1"`, `"MoofPort 2rc1"` / `"MoofPort 2rc1 installer"` |
+| `MP_INST_VER` (`mac/installer/installer.c`) | `"2"` | `"2rc1"` |
+| `VERSION` in `scripts/icons.py` (then `scripts/icons.py rez`) | `"2"` | `"2"` (the signature strings name the release) |
+| `docs/release/ReadMe.txt` line 1, CHANGELOG heading | `MoofPort 2`, `## 2 (<date>)` | `MoofPort 2rc1`, `## 2rc1 (release candidate, <date>)` |
+
+`release.sh` accepts only `<n>` or `<n>rc<k>`, and `relvers.py` checks that the installer's `vers` strings and
+`MP_INST_VER` match `<v>`. In prose write "MoofPort 2", not "2.0"; 1.0 keeps its name. Other projects' versions
+(MoofTCP 1.1, DaynaPORT 1.2.5) are theirs and are not renumbered. The version before 2 was in development as
+1.1 (`1.1rc1`, 2026-11-13); notes from that time that say "1.1" mean MoofPort 2.
+
 `dist/` is gitignored; the payload and the files are generated, never committed. Nothing Apple or
 DaynaPORT is in them: the installer carries MoofPort's own driver (`'MPDV'` 128) and keeps whatever
 DaynaPORT driver is already on the Mac.
@@ -54,9 +74,9 @@ humount`), macutils (`binhex hexbin`), `unar`/`lsar` (The Unarchiver), `gcc`, `p
 
 ## Build
 
-    scripts/release.sh 1.0               # builds, makes the files, runs release-verify.sh
-    scripts/release.sh --force 1.0       # replace existing dist/MoofPort-1.0.*
-    scripts/release.sh --no-build 1.0    # reuse build-mac/ (the release-build checks still run)
+    scripts/release.sh 2                 # builds, makes the files, runs release-verify.sh
+    scripts/release.sh --force 2         # replace existing dist/MoofPort-2.*
+    scripts/release.sh --no-build 2      # reuse build-mac/ (the release-build checks still run)
 
 Steps:
 
@@ -101,8 +121,8 @@ previous `release.sh` (one `dist/release/MoofPort-<v>.sit.hqx` through `stage-hw
 
 ## Verify
 
-    scripts/release-verify.sh 1.0               # every format with independent readers
-    scripts/release-verify.sh --self-test 1.0   # the artifacts pass AND broken copies fail
+    scripts/release-verify.sh 2                 # every format with independent readers
+    scripts/release-verify.sh --self-test 2     # the artifacts pass AND broken copies fail
 
 Readers (`scripts/relverify.py`):
 
@@ -161,7 +181,7 @@ data byte for byte (only Finder-written resource-header bytes and kHasBeenInited
 
 ## Publishing (not scripted)
 
-Pushing and the GitHub release are manual steps. Upload `MoofPort-<v>.dsk`, `.sit`, `.sit.hqx` and
+Pushing, tagging (`v<v>`, see Versioning) and the GitHub release are manual steps. Upload `MoofPort-<v>.dsk`, `.sit`, `.sit.hqx` and
 `.sha256` as release assets, with notes in the style of MoofTCP's `dist/release-1.0/RELEASE_NOTES.md`
 (Download table, highlights, tested, known limitations). CI (if added, like MoofTCP's host-test
 workflow) runs on push and is not part of the release build.

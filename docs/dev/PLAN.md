@@ -565,6 +565,9 @@ MoofTCP on top of MoofPort is where the larger bulk gains will show.
    MoofTCP 1.1 switches MoofPort to steadyack itself with MP_CTL_TUNE when it opens .ENET0; the ABI it
    relies on (version word, layout, how to detect MoofPort) is documented in `mp_drv.h` as a stable
    contract. Resident memory 17,560 bytes (Snow, installer path, HeapInfoOpen), 18 under the cap.
+8. **Whole-number release versions (2026-11-18).** Matt decided that releases after 1.0 are numbered
+   2, 3, ... (tags `v2`, ...; release candidates `2rc1`, tag `v2rc1`). The 1.1 work above ships as MoofPort 2;
+   `v1.0` stays. The rules and every place the version lives are in `docs/dev/RELEASE.md`, Versioning.
 
 ---
 

@@ -2,7 +2,7 @@
  * (its "settings" line) both offer, in one place so the two stay the same. Header only, no
  * Toolbox; tests/test_levers.c checks every name. Needs mp_drv.h first.
  *
- *   new        the boot defaults (mp_tune_boot in mp_drv.h): MoofPort 1.0's values, in 1.1 too
+ *   new        the boot defaults (mp_tune_boot in mp_drv.h): MoofPort 1.0's values, in 2 too
  *   old        the same (5 ms bursts, 17/51 ms ticks, 5 ms after a WRITE); the name 1.0 results keep
  *   rx4        the 1.0 defaults, but up to 4 received frames per poll tick
  *   chase1     the 1.0 defaults, but a poll right after an inline WRITE, then every 1 ms
@@ -27,7 +27,7 @@ static void mp_tune_defaults(MpTune *t)
 }
 
 /* MoofPort 1.0's defaults, the same values. Every older preset ("the defaults but ...", oldhush,
- * noinline, ...) is built on these, so results from before 1.1 still mean what they did. */
+ * noinline, ...) is built on these, so results from before MoofPort 2 still mean what they did. */
 static void mp_tune_old(MpTune *t)
 {
     mp_tune_boot(t);

@@ -95,7 +95,7 @@ typedef struct MpTune {
                                         after the WRITE, so earlier READs come back empty) */
 
 /* The tune the driver starts with: MoofPort 1.0's defaults (5 ms bursts, 17/51 ms ticks, 5 ms after a
- * WRITE; MoofTune/MoofBatch call them "old", "new" and "default"). 1.1 kept them after hardware runs
+ * WRITE; MoofTune/MoofBatch call them "old", "new" and "default"). MoofPort 2 kept them after hardware runs
  * under MacTCP found "steadyack" (a poll every 16 ms, 2 ms after an inline WRITE) worse there; MoofTCP
  * 1.1 switches MoofPort to steadyack itself with MP_CTL_TUNE when it opens .ENET0. The driver applies
  * this at open; the tools start from it, so Status shows exactly it until someone changes it. */

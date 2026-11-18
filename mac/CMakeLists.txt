@@ -58,6 +58,12 @@ target_include_directories(AfpCopy PRIVATE driver ${CMAKE_CURRENT_SOURCE_DIR}/..
 add_application(MoofTune   mooftune/mooftune.c   mooftune/mooftune.r ${RUNID} CREATOR "MPTU")
 moofport_bundle_bit(MoofTune)
 target_include_directories(MoofTune PRIVATE driver ${CMAKE_CURRENT_SOURCE_DIR}/../core)
+# Retro68's Rez rule depends only on the .r itself; the apps that #include icons.r (signature string with
+# the version, scripts/icons.py) must rebuild when it changes. MoofPortInstall lists it in its own rule.
+foreach(r moofstat mooftune)
+  add_custom_command(OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/${r}.r.rsrc.bin APPEND
+    DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/icons/icons.r)
+endforeach()
 
 # ---- SpyENET: INIT + spy DRVR (code-resource recipe) ----
 

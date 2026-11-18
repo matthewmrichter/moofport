@@ -1,5 +1,5 @@
-MoofPort 1.1rc1
-===============
+MoofPort 2
+==========
 
 MoofPort is an Ethernet driver (.ENET0) for the Wi-Fi of the
 BlueSCSI v2 (DaynaPORT emulation) on a Macintosh Classic with
@@ -19,22 +19,23 @@ This folder contains these files:
   - Read Me: this text.
 
 
-NEW IN 1.1
+NEW IN 2
 
-This is a release candidate (1.1rc1).
+MoofPort now numbers its releases 1.0, 2, 3, ... This is
+the second release.
 
-MoofPort 1.1 starts with the same timing settings as 1.0, so
+MoofPort 2 starts with the same timing settings as 1.0, so
 under MacTCP it works as 1.0 did.
 
 MoofTCP 1.1 switches MoofPort to its "steadyack" setting when
 it opens the driver. Measured on a real Mac Classic over the
 BlueSCSI v2 Wi-Fi (medians, timed on the PC): MoofTCP 1.1 with
-MoofPort 1.1, against 1.0's behaviour (the MoofTCP 1.0 engine,
+MoofPort 2, against 1.0's behaviour (the MoofTCP 1.0 engine,
 with MoofPort at 1.0's settings). The gains come from both
 together: MoofTCP 1.1's shorter path and MoofPort's
 "steadyack" timing.
 
-                          1.0           1.1
+                          1.0           2
   Echo round trip         53.6 ms       41.4 ms
   Terminal burst,         153.6 ms      124.6 ms
     2,000 bytes
@@ -52,7 +53,7 @@ To go back to 1.0: open the 1.0 MoofPortInstall, click Update
 (it installs its own driver whatever version is installed),
 and restart.
 
-MoofPort 1.1 uses 17,560 bytes of system memory (measured in
+MoofPort 2 uses 17,560 bytes of system memory (measured in
 the emulator; 1.0 used 17,528).
 
 
@@ -219,8 +220,8 @@ Measured on a real Mac Classic (8 MHz 68000, 4 MB, System 6.0.8,
 MacTCP 2.1) on 2026-11-10, in one session. DaynaPORT 1.2.5 and
 MoofPort 1.0 alternated in blocks, so both had the same Wi-Fi
 conditions. The PC measured the times. The figures are medians.
-MoofPort 1.1 starts with the same settings as 1.0. For MoofPort
-1.1 with MoofTCP 1.1, see NEW IN 1.1.
+MoofPort 2 starts with the same settings as 1.0. For MoofPort 2
+with MoofTCP 1.1, see NEW IN 2.
 
                           MoofPort 1.0  DaynaPORT 1.2.5
   TCP receive, 1 MB       61.5 KB/s     46.9 KB/s  (+31%)

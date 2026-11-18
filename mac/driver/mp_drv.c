@@ -21,7 +21,7 @@
  *             60 Hz tick (Ticks, the System's timers) is not lost (hwsend: 65% lost when ticks
  *             ran 20-37 ms with 13 ms WRITEs inside MacTCP's interrupt-level EWrites).
  *             The interval comes from the core's mp_poll. The boot tune (mp_tune_boot in
- *             mp_drv.h) is the 1.0 defaults (decision 6; 1.1 keeps them, MoofTCP 1.1 applies
+ *             mp_drv.h) is the 1.0 defaults (decision 6; MoofPort 2 keeps them, MoofTCP 1.1 applies
  *             "steadyack" itself): 5 ms for 60 ms after traffic (hw6:
  *             receive +9%), one tick until 2 s of quiet, then out to three ticks (hw6: 36% fewer
  *             empty polls on an idle Mac); MoofTune/MoofBatch "old" is the same. Every

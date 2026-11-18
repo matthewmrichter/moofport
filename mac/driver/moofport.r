@@ -29,7 +29,7 @@ data 'sysz' (0) {
 };
 
 resource 'vers' (1) {
-    0x01, 0x10, beta, 0x01, verUS,
-    "1.1rc1",
-    "MoofPort 1.1rc1"
+    0x02, 0x00, release, 0x00, verUS,
+    "2",
+    "MoofPort 2"
 };

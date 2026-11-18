@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # Build the MoofPort release files (port of MoofTCP's scripts/release.sh; docs/dev/RELEASE.md).
-#   release.sh [--force] [--no-build] <version>        e.g. release.sh 1.0
+#   release.sh [--force] [--no-build] <version>        e.g. release.sh 2, release.sh 3rc1
+# <version> is a whole number, optionally with rcN (docs/dev/RELEASE.md, Versioning); 1.0 was the last dotted one.
 # Output (dist/ is gitignored; existing outputs are refused without --force):
 #   dist/MoofPort-<v>.dsk       800K HFS image, volume "MoofPort": MoofPortInstall, MoofStat, MoofTune, Read Me
 #   dist/MoofPort-<v>.sit       StuffIt 1.5.1-compatible archive of the same four files, both forks,
@@ -30,7 +31,8 @@ while [ $# -gt 0 ]; do
 done
 [ $# -eq 1 ] || die "usage: release.sh [--force] [--no-build] <version>"
 ver="$1"
-case "$ver" in ""|.*|*[!A-Za-z0-9._-]*) die "version must match [A-Za-z0-9._-] and not start with '.'";; esac
+[[ "$ver" =~ ^[1-9][0-9]*(rc[1-9][0-9]*)?$ ]] \
+  || die "version must be a whole number, optionally with rcN (2, 3rc1; docs/dev/RELEASE.md, Versioning)"
 for t in docker hformat hmount hcopy hls humount binhex hexbin unar lsar gcc python3 sha256sum; do
   command -v "$t" >/dev/null || die "$t not installed (see docs/dev/RELEASE.md)"
 done

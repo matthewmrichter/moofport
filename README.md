@@ -52,21 +52,20 @@ you can read, tests, and somebody to fix it.
 - Uses newer BlueSCSI firmware's several-packets-per-command READ and WRITE when it is there, and
   works with older firmware one packet at a time.
 - MoofStat shows the driver's counters; MoofTune changes its timing until the next restart.
-  MoofPort 1.1 starts with 1.0's timing; MoofTCP 1.1 switches it to its `steadyack` setting itself when it opens the driver.
+  MoofPort 2 starts with 1.0's timing; MoofTCP 1.1 switches it to its `steadyack` setting itself when it opens the driver.
 - Open source (MIT), with host unit tests and emulator tests.
 
-## New in 1.1 (release candidate 1.1rc1)
+## New in 2
 
-1.1rc1 is a release candidate. The download on the Releases page is still 1.0, and the file names below stay 1.0
-until 1.1 is final.
+MoofPort numbers its releases with whole numbers from 2 on: 1.0 was the first release, 2 is the second.
 
-MoofPort 1.1 starts with 1.0's timing settings, so under MacTCP it works as 1.0 did.
+MoofPort 2 starts with 1.0's timing settings, so under MacTCP it works as 1.0 did.
 [MoofTCP](https://github.com/matthewmrichter/mooftcp/) 1.1 switches MoofPort to its `steadyack` setting when it
 opens the driver. Measured on a real Mac Classic (System 6.0.8, 4 MB, BlueSCSI v2 Wi-Fi), timed on the PC: MoofTCP
-1.1 with MoofPort 1.1 against 1.0's behaviour (the MoofTCP 1.0 engine, with MoofPort at 1.0's settings). The gains
+1.1 with MoofPort 2 against 1.0's behaviour (the MoofTCP 1.0 engine, with MoofPort at 1.0's settings). The gains
 come from both together: MoofTCP 1.1's shorter call path and MoofPort's `steadyack` timing. Medians:
 
-|                             | 1.0       | 1.1       |
+|                             | 1.0       | 2         |
 | --------------------------- | --------- | --------- |
 | Echo round trip, 1 byte     | 53.6 ms   | 41.4 ms   |
 | Terminal burst, 2,000 bytes | 153.6 ms  | 124.6 ms  |
@@ -128,12 +127,12 @@ MoofTune and Read Me. Download one file:
 
 | File                   | Use this file when                                                                                                                                      |
 | ---------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `MoofPort-1.0.sit.hqx` | You expand files with StuffIt Expander or StuffIt Lite on the Mac. If you are not sure, use this file. It is text, so a text transfer cannot damage it. |
-| `MoofPort-1.0.sit`     | You expand files with StuffIt Expander or StuffIt Lite, and your transfer keeps files byte for byte.                                                    |
-| `MoofPort-1.0.dsk`     | You use a floppy emulator, an 800K floppy disk or a Mac emulator. This file is an 800K disk image.                                                      |
+| `MoofPort-2.sit.hqx`   | You expand files with StuffIt Expander or StuffIt Lite on the Mac. If you are not sure, use this file. It is text, so a text transfer cannot damage it. |
+| `MoofPort-2.sit`       | You expand files with StuffIt Expander or StuffIt Lite, and your transfer keeps files byte for byte.                                                    |
+| `MoofPort-2.dsk`       | You use a floppy emulator, an 800K floppy disk or a Mac emulator. This file is an 800K disk image.                                                      |
 
-`MoofPort-1.0.sha256` contains the SHA-256 checksums of the three files. To examine a download on
-another computer, use `sha256sum -c MoofPort-1.0.sha256`.
+`MoofPort-2.sha256` contains the SHA-256 checksums of the three files. To examine a download on
+another computer, use `sha256sum -c MoofPort-2.sha256`.
 
 ### Put the file on the Mac
 
@@ -143,7 +142,7 @@ Use one of these procedures:
   Mac, use the BlueSCSI Toolbox to copy the file to the hard disk.
 - **AppleShare server:** If the Mac has a network connection now, copy the file from an AppleShare
   server to the hard disk.
-- **Floppy disk image:** Put `MoofPort-1.0.dsk` on a floppy emulator, or write it to an 800K
+- **Floppy disk image:** Put `MoofPort-2.dsk` on a floppy emulator, or write it to an 800K
   floppy disk on a different computer.
 
 ### Expand the .sit.hqx or .sit file
@@ -275,10 +274,10 @@ in [TESTING_METHODOLOGY.md](TESTING_METHODOLOGY.md).
   alternating in blocks and all 16 copies checked byte for byte. Wi-Fi retries slowed the uploads for
   both drivers in that session. Without the retry pauses, MoofPort copied at 32.6 / 25.5 KB/s and
   DaynaPORT at 28.5 / 20.0 KB/s.
-- **Memory:** MoofPort 1.1 uses 17,560 bytes (1.0: 17,528), measured with `HeapInfoOpen` in the emulator; the
-  hardware figure for 1.1 is not confirmed yet. DaynaPORT's 16,554 was measured on the hardware.
-- **MoofPort 1.1** starts with the same settings as 1.0, so these MacTCP figures are 1.0's. For MoofPort 1.1 with
-  MoofTCP 1.1, see "New in 1.1".
+- **Memory:** MoofPort 2 uses 17,560 bytes (1.0: 17,528), measured with `HeapInfoOpen` in the emulator; the
+  hardware figure for 2 is not confirmed yet. DaynaPORT's 16,554 was measured on the hardware.
+- **MoofPort 2** starts with the same settings as 1.0, so these MacTCP figures are 1.0's. For MoofPort 2 with
+  MoofTCP 1.1, see "New in 2".
 
 Receiving and file sharing are faster; sending and latency are level with DaynaPORT.
 
@@ -312,7 +311,7 @@ The build uses Retro68 in Docker, and the portable core has host tests:
 
     scripts/build-mac.sh MoofPortInstall     # also MoofTune, MoofStat
     cmake -S . -B build && cmake --build build && ctest --test-dir build --output-on-failure
-    scripts/release.sh --force 1.0           # dist/MoofPort-1.0.{dsk,sit,sit.hqx,sha256}, verified
+    scripts/release.sh --force 2             # dist/MoofPort-2.{dsk,sit,sit.hqx,sha256}, verified
 
 `release.sh` also needs hfsutils, macutils, unar, gcc and Python 3.
 
@@ -347,7 +346,7 @@ Firmware v2026.01 or later is recommended. This firmware can send several packet
 command. Older firmware also operates, with one packet in each command.
 
 **Which file do I download?**
-Use `MoofPort-1.0.sit.hqx` if you are not sure. See Download.
+Use `MoofPort-2.sit.hqx` if you are not sure. See Download.
 
 **The Mac stops or shows a bomb at start-up.**
 

@@ -1,12 +1,16 @@
 # Changelog
 
-## 1.1rc1 (release candidate, 2026-11-13)
+From 2 on, MoofPort releases are numbered with whole numbers (1.0 was the first release, then 2, 3, ...); a
+release candidate is `<n>rc<k>`. Git tags are `v<n>` (`v1.0` stays as it was).
 
-MoofPort 1.1 works with MoofTCP 1.1 to make TCP faster. Under MacTCP it behaves as 1.0.
+## 2 (not yet released)
+
+MoofPort 2 works with MoofTCP 1.1 to make TCP faster. Under MacTCP it behaves as 1.0.
+Its release candidate was called 1.1rc1 (2026-11-13), under the old numbering.
 
 ### What's new
 
-- MoofPort 1.1 starts with 1.0's timing settings, so MacTCP users get 1.0's behaviour. (The `steadyack` setting
+- MoofPort 2 starts with 1.0's timing settings, so MacTCP users get 1.0's behaviour. (The `steadyack` setting
   was measured under MacTCP and was slower there: receive -10.2 KB/s, terminal burst +2.1 ms, echo +1.8 ms.)
 - A `steadyack` setting: check the network every 16 ms, and once more 2 ms after each packet sent. MoofTCP 1.1
   switches MoofPort to it when it opens the driver. MoofTune has it too.
@@ -22,7 +26,7 @@ MoofPort 1.1 works with MoofTCP 1.1 to make TCP faster. Under MacTCP it behaves 
 
 ### Tested
 
-- On a real Mac Classic (System 6.0.8, 4 MB, BlueSCSI v2 Wi-Fi), timed on the PC: MoofTCP 1.1 with MoofPort 1.1
+- On a real Mac Classic (System 6.0.8, 4 MB, BlueSCSI v2 Wi-Fi), timed on the PC: MoofTCP 1.1 with MoofPort 2
   against 1.0's behaviour (the MoofTCP 1.0 engine, with MoofPort at 1.0's settings). The gains come from both
   together: MoofTCP 1.1's shorter call path and MoofPort's `steadyack` timing. 2026-11-14, 10 pairs in one
   session, the AppleShare server's Wi-Fi power saving off. Medians, each better in all 10 pairs: echo 53.6 -> 41.4 ms,
