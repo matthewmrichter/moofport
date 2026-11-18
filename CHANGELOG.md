@@ -3,10 +3,10 @@
 From 2 on, MoofPort releases are numbered with whole numbers (1.0 was the first release, then 2, 3, ...); a
 release candidate is `<n>rc<k>`. Git tags are `v<n>` (`v1.0` stays as it was).
 
-## 2 (not yet released)
+## 2 (2026-11-18)
 
 MoofPort 2 works with MoofTCP 1.1 to make TCP faster. Under MacTCP it behaves as 1.0.
-Its release candidate was called 1.1rc1 (2026-11-13), under the old numbering.
+It was developed as 1.1 (release candidate 1.1rc1, 2026-11-13) and is the first release under whole-number versions.
 
 ### What's new
 
@@ -23,6 +23,11 @@ Its release candidate was called 1.1rc1 (2026-11-13), under the old numbering.
   `keep` settings, a receive-buffer setting, a terminal test and a `stack:` line; AfpCopy and the other test
   tools end by themselves in unattended runs; MoofStat prints the frame log of the diagnostic driver build.
 - Resident memory: 17,560 bytes, measured in the emulator (1.0: 17,528), within DaynaPORT's 16,554 + 1,024.
+- Version numbers are whole numbers: the release files are `MoofPort-2.*`, and MoofPortInstall reports version 2.
+  The version strings in MoofStat and MoofTune now say 2 as well (they had kept "1.0").
+- Documentation: the install, update and uninstall steps are now in `INSTALL.md`; the README states what was
+  tested (a Mac Classic with System 6.0.8; the Plus and SE should work but are untested; System 7 is not fully
+  functional yet).
 
 ### Tested
 
@@ -36,6 +41,8 @@ Its release candidate was called 1.1rc1 (2026-11-13), under the old numbering.
   with the network.
 - MoofTCP 1.1's MoofDiag showed `steadyack` applied in every MoofPort block.
 - Host unit tests with AddressSanitizer and UBSan; Snow runs of MoofBatch under MacTCP and under MoofTCP 1.1.
+- Release files: `release.sh 2` and `release-verify.sh --self-test 2` pass (every format read back with
+  independent tools).
 
 ### Known limitations
 
